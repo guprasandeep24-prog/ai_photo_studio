@@ -23,7 +23,12 @@ const razorpay = new Razorpay({
 });
 
 // 3. Middleware
-app.use(cors());
+// Isse replace kijiye (Apne server.js mein)
+app.use(cors({
+    origin: '*', // Yeh sabhi websites ko permission dega
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
