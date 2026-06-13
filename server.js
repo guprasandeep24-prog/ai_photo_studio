@@ -1,3 +1,4 @@
+// 1. Sabse pehle zaroori libraries load karein
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const express = require('express');
 const multer = require('multer');
@@ -6,23 +7,35 @@ const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 
 const app = express();
 
+// 2. Initialization
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+// 3. Middleware
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/templates', express.static(path.join(__dirname, 'templates')));
 
+// 4. Cloudinary Configuration
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// 5. Multer Setup (Local storage for temporary upload)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -35,30 +48,33 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// 🛠️ UPDATED TEMPLATES (Nested with Man/Woman)
+// 6. Templates & Prompts Map (Organized by Category & Gender)
+// Note: Men ke liye aapko baad mein apni links add karni hongi
 const TEMPLATES = {
     'linkedin': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/smiling-businessman-with-arms-crossed_dalfak.jpg', // <-- Change this with real Man link
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/man_suit_template.jpg', 
         'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231467/front-view-young-attractive-lady-black-jacket-white-shirt-front-table-working-with-laptop-work-business-technologies_rcaqts.jpg'
     },
     'wedding': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928082/Wedding_qq5pyd.jpg', // <-- Change this with real Man link
-        'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928236/Screenshot_2026-06-08_192024_klsa2g.png'
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/man_wedding_template.jpg',
+        'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231455/pexels-skgphotography-29370687_gxzak9.jpg'
     },
     'fashion': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', // <-- Change this with real Man link
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/man_fashion_template.jpg',
         'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg'
     }
 };
 
+// 7. AI Logic Function
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
-    console.log(`🤖 AI STARTING: ${category} - ${gender} shot...`);
+    console.log(`🤖 AI STARTING: ${category} mode for ${gender}...`);
 
-    // Target URL selecting based on Category and Gender
-    const targetImageUrl = TEMPLATES[category][gender];
+    const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
 
     try {
-        // Using the stable pikachupichu25 model with hash as you confirmed it works
+        console.log("📡 Contacting Replicate...");
+        
+        // Using your confirmed working Hash ID
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             {
@@ -69,8 +85,9 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         );
 
-        // Handling stream or direct URL
+        // Handle Stream if returned
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
+            console.log("🌊 Processing Stream to Cloudinary...");
             const chunks = [];
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
@@ -89,30 +106,33 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
         return Array.isArray(output) ? output[0] : output;
 
     } catch (error) {
-        console.error("❌ AI Error:", error.message);
+        console.error("❌ AI Model Error:", error.message);
         throw error;
     }
 }
 
+// 8. API Routes
+
+// ROUTE: Main Upload & AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
     let localFilePath = req.file ? req.file.path : null;
 
     try {
-        const { category, gender } = req.body; // Taking gender from frontend
+        const { category, gender } = req.body;
 
         if (!localFilePath || !category || !gender) {
-            return res.status(400).json({ success: false, error: "Missing data!" });
+            return res.status(400).json({ success: false, error: "Missing data (image, category, or gender)!" });
         }
 
-        console.log(`🚀 Request: ${category} | ${gender}`);
+        console.log(`🚀 Request Received: ${category} | ${gender}`);
 
-        // 1. Upload Selfie to Cloudinary
+        // 1. Upload selfie to Cloudinary
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
             folder: 'ai_studio_uploads'
         });
         const userImageUrl = cloudinaryResult.secure_url;
 
-        // 2. Run AI with Category AND Gender
+        // 2. Run AI
         const finalAiImageUrl = await runAIFaceSwap(userImageUrl, category, gender);
 
         // 3. Cleanup local file
@@ -121,7 +141,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.json({
             success: true,
             ai_image_url: finalAiImageUrl,
-            message: "Magic Complete!"
+            message: "Your photo is ready!"
         });
 
     } catch (error) {
@@ -131,7 +151,45 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
+// ROUTE: Razorpay Order Creation
+app.post('/create-order', async (req, res) => {
+    try {
+        const options = {
+            amount: 5000, // ₹50.00 (amount in paise)
+            currency: "INR",
+            receipt: `rcpt_${Date.now()}`,
+        };
+        const order = await razorpay.orders.create(options);
+        res.json(order);
+    } catch (error) {
+        console.error("Razorpay Order Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ROUTE: Razorpay Verification
+app.post('/verify-payment', async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+        const body = razorpay_order_id + "|" + razorpay_payment_id;
+        const expectedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString())
+            .digest("hex");
+
+        if (expectedSignature === razorpay_signature) {
+            res.json({ success: true, message: "Payment Verified" });
+        } else {
+            res.status(400).json({ success: false, error: "Payment verification failed" });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 9. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`✅ ENGINE LIVE AT http://localhost:${PORT}`);
+    console.log(`✅ AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
 });
