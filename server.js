@@ -50,7 +50,7 @@ const upload = multer({ storage: storage });
 // 5. Templates Map (Gender & Category wise)
 const TEMPLATES = {
     'linkedin': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/man_suit_template.jpg', 
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928123/linkdin_wfllbw.jpg ', 
         'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231467/front-view-young-attractive-lady-black-jacket-white-shirt-front-table-working-with-laptop-work-business-technologies_rcaqts.jpg'
     },
     'wedding': {
