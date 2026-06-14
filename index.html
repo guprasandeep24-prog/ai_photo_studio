@@ -120,82 +120,140 @@
     </div>
 
     <script>
-        let selectedCategory = "";
-        let selectedGender = ""; // Naya Variable
-        let selectedFile = null;
+    let selectedCategory = "";
+    let selectedGender = ""; // Gender track karne ke liye
+    let selectedFile = null;
 
-        function selectCategory(cat) {
-            selectedCategory = cat;
-            // Reset Gender when category changes
-            selectedGender = ""; 
-            document.getElementById('btn-man').classList.remove('active');
-            document.getElementById('btn-woman').classList.remove('active');
+    // 1. Category Selection
+    function selectCategory(cat) {
+        selectedCategory = cat;
+        selectedGender = ""; // Reset gender when category changes
+        document.getElementById('btn-man').classList.remove('active');
+        document.getElementById('btn-woman').classList.remove('active');
+        document.getElementById('upload-section').classList.remove('hidden');
+        document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
+        document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
+    }
 
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
-            document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
+    // 2. Gender Selection
+    function selectGender(gender) {
+        selectedGender = gender;
+        document.getElementById('btn-man').classList.toggle('active', gender === 'man');
+        document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+    }
+
+    // 3. Image Preview
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                document.getElementById('imagePreview').src = event.target.result;
+                document.getElementById('preview-container').classList.remove('hidden');
+                document.getElementById('submitBtn').classList.remove('hidden');
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 4. MAIN FLOW: Upload -> AI -> Razorpay -> Success
+    document.getElementById('submitBtn').addEventListener('click', async function() {
+        // Validation
+        if (!selectedGender) {
+            alert("Please select Gender (Man or Woman) first!");
+            return;
+        }
+        if (!selectedFile) {
+            alert("Please select an image!");
+            return;
         }
 
-        function selectGender(gender) {
-            selectedGender = gender;
-            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
-            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+        formData.append('category', selectedCategory);
+        formData.append('gender', selectedGender);
+
+        // Show Loading
+        document.getElementById('loadingModal').classList.remove('hidden');
+
+        try {
+            // --- STEP A: AI Generation (Backend call) ---
+            console.log("Step 1: Starting AI Generation...");
+            const response = await fetch('https://ai-photo-studio-e3so.onrender.com/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || "AI Generation failed");
+            }
+
+            const aiImageUrl = result.ai_image_url;
+            console.log("Step 1 Success: AI Photo ready:", aiImageUrl);
+
+            // --- STEP B: Razorpay Payment Trigger ---
+            console.log("Step 2: Triggering Razorpay...");
+            
+            // 1. Pehle backend se Order ID mangiye
+            const orderRes = await fetch('https://ai-photo-studio-backend.onrender.com/create-order', {
+                method: 'POST'
+            });
+            const orderData = await orderRes.json();
+
+            // 2. Razorpay Checkout open kijiye
+            const options = {
+                "key": "rzp_test_T0igS1UI99gp4v", // ⚠️ IMPORTANT: Apni Razorpay Key yahan dalein
+                "amount": orderData.amount,
+                "currency": "INR",
+                "name": "AI Photo Studio",
+                "description": "Premium AI Photo Generation",
+                "order_id": orderData.id,
+                "handler": async function (response) {
+                    // Jab payment successful ho jaye...
+                    console.log("Payment Successful, verifying...");
+                    
+                    // 3. Verification ke liye backend ko bhejiye
+                    const verifyRes = await fetch('https://ai-photo-studio-backend.onrender.com/verify-payment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature
+                        })
+                    });
+
+                    const verifyResult = await verifyRes.json();
+
+                    if (verifyResult.success) {
+                        // 4. PAYMENT SUCCESS! Ab result dikhaiye
+                        console.log("Verification Success!");
+                        document.getElementById('loadingModal').classList.add('hidden');
+                        
+                        // Set image and show success modal
+                        document.getElementById('resultImage').src = aiImageUrl;
+                        document.getElementById('downloadBtn').href = aiImageUrl;
+                        document.getElementById('successModal').classList.remove('hidden');
+                    } else {
+                        alert("Payment verification failed!");
+                        document.getElementById('loadingModal').classList.add('hidden');
+                    }
+                },
+                "prefill": { "name": "", "email": "" },
+                "theme": { "color": "#4f46e5" }
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+
+        } catch (err) {
+            console.error("Error flow:", err);
+            alert("Error: " + err.message);
+            document.getElementById('loadingModal').classList.add('hidden');
         }
-
-        document.getElementById('imageInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                selectedFile = file;
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    document.getElementById('imagePreview').src = event.target.result;
-                    document.getElementById('preview-container').classList.remove('hidden');
-                    document.getElementById('submitBtn').classList.remove('hidden');
-                }
-                reader.readAsDataURL(file);
-            }
-        });
-
-        document.getElementById('submitBtn').addEventListener('click', async function() {
-            // Check if gender is selected
-            if (!selectedGender) {
-                alert("Please select gender (Man or Woman)");
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('image', selectedFile);
-            formData.append('category', selectedCategory);
-            formData.append('gender', selectedGender); // Gender bhi bhej rahe hain
-
-            document.getElementById('loadingModal').classList.remove('hidden');
-
-            try {
-                const response = await fetch('https://ai-photo-studio-e3so.onrender.com/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    // Show Result
-                    const resImg = document.getElementById('resultImage');
-                    const dlBtn = document.getElementById('downloadBtn');
-                    resImg.src = result.ai_image_url;
-                    dlBtn.href = result.ai_image_url;
-                    
-                    document.getElementById('successModal').classList.remove('hidden');
-                } else {
-                    alert("Error: " + result.error);
-                    document.getElementById('loadingModal').classList.add('hidden');
-                }
-            } catch (err) {
-                alert("Server error! Make sure your Node.js server is running.");
-                document.getElementById('loadingModal').classList.add('hidden');
-            }
-        });
-    </script>
+    });
+</script>
 </body>
 </html>
