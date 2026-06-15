@@ -21,8 +21,12 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// 2. Middleware
-app.use(cors());
+// 3. Middleware
+app.use(cors({
+    origin: 'https://guprasandeep24-prog.github.io', // Aapki website ka exact URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
@@ -50,15 +54,15 @@ const upload = multer({ storage: storage });
 // 5. Templates Map (Gender & Category wise)
 const TEMPLATES = {
     'linkedin': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928123/linkdin_wfllbw.jpg ', 
-        'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231467/front-view-young-attractive-lady-black-jacket-white-shirt-front-table-working-with-laptop-work-business-technologies_rcaqts.jpg'
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/smiling-businessman-with-arms-crossed_dalfak.jpg ', 
+        'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781527213/linkdin_ceo_woman1_p0hoc3.jpg'
     },
     'wedding': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/man_wedding_template.jpg',
-        'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231455/pexels-skgphotography-29370687_gxzak9.jpg'
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928082/Wedding_qq5pyd.jpg',
+        'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231450/pexels-creative-studio-830123672-19376431_mancpc.jpg'
     },
     'fashion': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/man_fashion_template.jpg',
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg',
         'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg'
     }
 };
