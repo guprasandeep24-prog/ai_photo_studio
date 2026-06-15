@@ -12,21 +12,23 @@ const crypto = require('crypto');
 const app = express();
 
 // 1. Initialization & Debugging Check
-console.log("🛠️ Initializing Server...");
+console.log("🛠️ Initializing AI Studio Server...");
 
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// Check if Razorpay keys are present to prevent crash at startup
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    console.warn("⚠️ WARNING: Razorpay Keys are missing in Environment Variables!");
+// Razorpay Initialization with Error Safety
+let razorpay;
+try {
+    razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    console.log("✅ Razorpay Initialized Successfully");
+} catch (err) {
+    console.error("❌ CRITICAL: Razorpay Initialization Failed:", err.message);
 }
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
 
 // 2. Middleware
 app.use(cors({
@@ -138,21 +140,36 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// ROUTE 2: Razorpay Order
+// ROUTE 2: Razorpay Order (RE-ENGINEERED FOR STABILITY)
 app.post('/create-order', async (req, res) => {
     console.log("💰 Razorpay Order Request Received!");
-    if (!razorpay) {
-        return res.status(500).json({ success: false, error: "Payment system not initialized." });
+
+    // Check if razorpay object exists and has valid keys
+    if (!razorpay || !razorpay.key_id) {
+        console.error("❌ ERROR: Razorpay instance is not properly initialized. Check Environment Variables!");
+        return res.status(500).json({ success: false, error: "Payment system not initialized on server." });
     }
 
     try {
-        const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
+        const options = { 
+            amount: 5000, // ₹50.00
+            currency: "INR", 
+            receipt: `rcpt_${Date.now()}` 
+        };
+
+        console.log("📡 Sending request to Razorpay API...");
         const order = await razorpay.orders.create(options);
+        
         console.log("✅ Order Created Successfully:", order.id);
         res.json(order);
+
     } catch (error) {
-        console.error("❌ RAZORPAY ORDER ERROR:", error);
-        res.status(500).json({ success: false, error: error.message });
+        // This will catch everything from network errors to Razorpay API errors
+        console.error("❌ RAZORPAY API ERROR:", error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || "Razorpay request failed" 
+        });
     }
 });
 
@@ -162,17 +179,24 @@ app.post('/verify-payment', async (req, res) => {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         const body = razorpay_order_id + "|" + razorpay_payment_id;
-        const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(body.toString()).digest("hex");
+        
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            throw new Error("RAZORPAY_KEY_SECRET is missing in Environment Variables");
+        }
+
+        const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString())
+            .digest("hex");
 
         if (expectedSignature === razorpay_signature) {
-            console.log("✅ Payment Verified!");
+            console.log("✅ Payment Verified Successfully!");
             res.json({ success: true });
         } else {
             console.warn("⚠️ Signature Mismatch!");
             res.status(400).json({ success: false, error: "Verification failed" });
         }
     } catch (error) {
-        console.error("❌ VERIFICATION ERROR:", error);
+        console.error("❌ VERIFICATION ERROR:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
