@@ -11,19 +11,26 @@ const crypto = require('crypto');
 
 const app = express();
 
-// 1. Initialization
+// 1. Initialization & Debugging Check
+console.log("🛠️ Initializing Server...");
+
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
+
+// Check if Razorpay keys are present to prevent crash at startup
+if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    console.warn("⚠️ WARNING: Razorpay Keys are missing in Environment Variables!");
+}
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// 3. Middleware
+// 2. Middleware
 app.use(cors({
-    origin: 'https://guprasandeep24-prog.github.io', // Aapki website ka exact URL
+    origin: 'https://guprasandeep24-prog.github.io', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
@@ -51,10 +58,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// 5. Templates Map (Gender & Category wise)
+// 5. Templates Map
 const TEMPLATES = {
     'linkedin': {
-        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/smiling-businessman-with-arms-crossed_dalfak.jpg ', 
+        'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/smiling-businessman-with-arms-crossed_dalfak.jpg', 
         'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781527213/linkdin_ceo_woman1_p0hoc3.jpg'
     },
     'wedding': {
@@ -100,14 +107,14 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
         }
         return Array.isArray(output) ? output[0] : output;
     } catch (error) {
-        console.error("❌ AI Error:", error.message);
+        console.error("❌ AI Error Details:", error.message);
         throw error;
     }
 }
 
 // 7. API ROUTES
 
-// ROUTE 1: AI Generation (Upload + AI)
+// ROUTE 1: AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
     let localFilePath = req.file ? req.file.path : null;
     try {
@@ -118,17 +125,14 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         console.log(`🚀 Request: ${category} | ${gender}`);
 
-        // 1. Upload Selfie
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
-        
-        // 2. Run AI
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
-        // 3. Cleanup
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
 
         res.json({ success: true, ai_image_url: finalAiImageUrl });
     } catch (error) {
+        console.error("❌ Upload Route Error:", error.message);
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         res.status(500).json({ success: false, error: error.message });
     }
@@ -136,33 +140,53 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
 // ROUTE 2: Razorpay Order
 app.post('/create-order', async (req, res) => {
+    console.log("💰 Razorpay Order Request Received!");
+    if (!razorpay) {
+        return res.status(500).json({ success: false, error: "Payment system not initialized." });
+    }
+
     try {
         const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
         const order = await razorpay.orders.create(options);
+        console.log("✅ Order Created Successfully:", order.id);
         res.json(order);
     } catch (error) {
+        console.error("❌ RAZORPAY ORDER ERROR:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 // ROUTE 3: Razorpay Verification
 app.post('/verify-payment', async (req, res) => {
+    console.log("🔐 Verifying Payment...");
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         const body = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(body.toString()).digest("hex");
 
         if (expectedSignature === razorpay_signature) {
+            console.log("✅ Payment Verified!");
             res.json({ success: true });
         } else {
+            console.warn("⚠️ Signature Mismatch!");
             res.status(400).json({ success: false, error: "Verification failed" });
         }
     } catch (error) {
+        console.error("❌ VERIFICATION ERROR:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 8. Start Server
+// 8. GLOBAL ERROR HANDLER (The "Anti-Crash" Shield)
+app.use((err, req, res, next) => {
+    console.error("💥 GLOBAL CRITICAL ERROR:", err.stack);
+    res.status(500).json({ 
+        success: false, 
+        error: "Internal Server Error. Check logs for details." 
+    });
+});
+
+// 9. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`✅ AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
