@@ -8,39 +8,31 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const mongoose = require('mongoose'); // 1. Mongoose added
-const Order = require('./models/Order'); // Isse server ko pata chalega Order model kahan hai
+const mongoose = require('mongoose');
+
+// IMPORT ORDER MODEL (Isse hum database se baat karenge)
+const Order = require('./models/Order'); 
+
 const app = express();
 
 // 1. Initialization & Deep Debugging
 console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
 
-// --- NEW: MongoDB Connection ---
+// --- MongoDB Connection ---
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
 
-// --- NEW: Order Model (Database Schema) ---
-const OrderSchema = new mongoose.Schema({
-    category: { type: String, required: true },
-    gender: { type: String, required: true },
-    aiImageUrl: { type: String, required: true },
-    razorpayOrderId: { type: String, required: true, unique: true },
-    razorpayPaymentId: { type: String },
-    status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
-    createdAt: { type: Date, default: Date.now }
-});
-
-
+// --- Replicate Initialization ---
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// Razorpay Initialization
+// --- Razorpay Initialization ---
 let razorpay;
 try {
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        console.error("❌ [CRITICAL] Razorpay Keys are MISSING!");
+        console.error("❌ [CRITICAL] Razorpay Keys are MISSING in Environment Variables!");
     } else {
         razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID,
@@ -141,7 +133,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { category, gender } = req.body;
         if (!localFilePath || !category || !gender) {
-            return res.status(400).json({ success: false, error: "Missing required info!" });
+            return res.status(400).json({ success: false, error: "Missing info!" });
         }
 
         console.log(`🚀 [UPLOAD] Processing: ${category} | ${gender}`);
@@ -158,9 +150,9 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// ROUTE 2: Razorpay Order (UPDATED WITH MONGODB)
+// ROUTE 2: Razorpay Order (UPDATED)
 app.post('/create-order', async (req, res) => {
-    const { category, gender, aiImageUrl } = req.body; // Frontend se ye data aayega
+    const { category, gender, aiImageUrl } = req.body; 
     console.log("💰 [PAYMENT] Create Order Request Received!");
 
     if (!razorpay) return res.status(500).json({ success: false, error: "Payment system offline." });
@@ -169,7 +161,7 @@ app.post('/create-order', async (req, res) => {
         const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
         const order = await razorpay.orders.create(options);
 
-        // --- NEW: Save to MongoDB ---
+        // Database mein order save karo
         await Order.create({
             category,
             gender,
@@ -177,7 +169,7 @@ app.post('/create-order', async (req, res) => {
             razorpayOrderId: order.id,
             status: 'pending'
         });
-        console.log("✅ [DATABASE] Pending Order Saved:", order.id);
+        console.log("✅ [DATABASE] Order Saved:", order.id);
 
         res.json(order);
     } catch (error) {
@@ -186,7 +178,7 @@ app.post('/create-order', async (req, res) => {
     }
 });
 
-// ROUTE 3: Razorpay Verification (UPDATED WITH MONGODB)
+// ROUTE 3: Razorpay Verification
 app.post('/verify-payment', async (req, res) => {
     console.log("🔐 [PAYMENT] Verifying Signature...");
     try {
@@ -196,7 +188,7 @@ app.post('/verify-payment', async (req, res) => {
             .update(body.toString()).digest("hex");
 
         if (expectedSignature === razorpay_signature) {
-            // --- NEW: Update MongoDB Status ---
+            // Database update karo
             await Order.findOneAndUpdate(
                 { razorpayOrderId: razorpay_order_id },
                 { status: 'completed', razorpayPaymentId: razorpay_payment_id }
@@ -204,7 +196,6 @@ app.post('/verify-payment', async (req, res) => {
             console.log("✅ [DATABASE] Order Marked as Completed!");
             res.json({ success: true });
         } else {
-            console.warn("⚠️ [PAYMENT] Signature Mismatch!");
             res.status(400).json({ success: false, error: "Verification failed" });
         }
     } catch (error) {
@@ -215,7 +206,7 @@ app.post('/verify-payment', async (req, res) => {
 
 // 8. GLOBAL ERROR HANDLER
 app.use((err, req, res, next) => {
-    console.error("💥 [CRITICAL SYSTEM ERROR]:", err.stack);
+    console.error("💥 [CRITICAL ERROR]:", err.stack);
     res.status(500).json({ success: false, error: "Internal Server Error" });
 });
 
