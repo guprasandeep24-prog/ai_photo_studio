@@ -9,7 +9,7 @@ const Replicate = require('replicate');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose'); // 1. Mongoose added
-
+const Order = require('./models/Order'); // Isse server ko pata chalega Order model kahan hai
 const app = express();
 
 // 1. Initialization & Deep Debugging
