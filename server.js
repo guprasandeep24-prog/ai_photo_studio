@@ -30,7 +30,7 @@ const OrderSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
 });
-const Order = mongoose.model('Order', OrderSchema);
+
 
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
