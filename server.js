@@ -10,31 +10,21 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
-// IMPORT ORDER MODEL (Isse hum database se baat karenge)
-const Order = require('./models/Order'); 
-
 const app = express();
 
-// 1. Initialization & Deep Debugging
+// 1. Initialization
 console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
 
-// --- NEW: MongoDB Connection with TRIM (Safai wala feature) ---
+// --- SINGLE MONGODB CONNECTION (No Duplicates!) ---
 const mongoURI = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : "";
-
-if (!mongoURI) {
-    console.error("❌ [CRITICAL] MONGODB_URI is missing in Environment Variables!");
-} else {
-    // .trim() ensures no extra spaces or newlines break the connection
-    mongoose.connect(mongoURI)
-        .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
-        .catch(err => console.error("❌ [DATABASE] Connection Error:", err.message));
-}
+mongoose.connect(mongoURI)
+    .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
+    .catch(err => console.error("❌ [DATABASE] Connection Error:", err.message));
 
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// Razorpay Initialization
 let razorpay;
 try {
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -139,7 +129,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { category, gender } = req.body;
         if (!localFilePath || !category || !gender) {
-            return res.status(400).json({ success: false, error: "Missing required info!" });
+            return res.status(400).json({ success: false, error: "Missing info!" });
         }
 
         console.log(`🚀 [UPLOAD] Processing: ${category} | ${gender}`);
@@ -167,6 +157,7 @@ app.post('/create-order', async (req, res) => {
         const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
         const order = await razorpay.orders.create(options);
 
+        // Save to DB
         await Order.create({
             category,
             gender,
@@ -175,6 +166,7 @@ app.post('/create-order', async (req, res) => {
             status: 'pending'
         });
         console.log("✅ [DATABASE] Order Saved:", order.id);
+
         res.json(order);
     } catch (error) {
         console.error("❌ [RAZORPAY ERROR]:", error);
