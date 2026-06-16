@@ -167,13 +167,24 @@
                 const aiImageUrl = aiResult.ai_image_url;
                 console.log("Step 1 Success:", aiImageUrl);
 
-                // STEP 2: Razorpay Order
-                console.log("Step 2: Triggering Razorpay...");
-                const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
-                    method: 'POST'
-                });
-                if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
-                const orderData = await orderRes.json();
+                // --- STEP B: Razorpay Payment Trigger ---
+console.log("Step 2: Triggering Razorpay...");
+
+// 1. Pehle backend se Order ID mangiye + Data bhejiye
+const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, // JSON bhejna zaroori hai
+    body: JSON.stringify({
+        category: selectedCategory,
+        gender: selectedGender,
+        aiImageUrl: aiImageUrl // Jo Step 1 se mila
+    })
+});
+
+if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
+const orderData = await orderRes.json();
+
+// ... (baaki ka Razorpay popup wala code same rahega)
 
                 // STEP 3: Razorpay Checkout
                 const options = {

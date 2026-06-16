@@ -8,21 +8,39 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const mongoose = require('mongoose'); // 1. Mongoose added
 
 const app = express();
 
 // 1. Initialization & Deep Debugging
 console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
 
+// --- NEW: MongoDB Connection ---
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
+    .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
+
+// --- NEW: Order Model (Database Schema) ---
+const OrderSchema = new mongoose.Schema({
+    category: { type: String, required: true },
+    gender: { type: String, required: true },
+    aiImageUrl: { type: String, required: true },
+    razorpayOrderId: { type: String, required: true, unique: true },
+    razorpayPaymentId: { type: String },
+    status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
+    createdAt: { type: Date, default: Date.now }
+});
+const Order = mongoose.model('Order', OrderSchema);
+
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// Razorpay Initialization with extreme safety
+// Razorpay Initialization
 let razorpay;
 try {
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        console.error("❌ [CRITICAL] Razorpay Keys are MISSING in Environment Variables!");
+        console.error("❌ [CRITICAL] Razorpay Keys are MISSING!");
     } else {
         razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID,
@@ -86,19 +104,16 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
 
     try {
-        console.log("📡 [AI] Contacting Replicate API...");
+        console.log("📡 [AI] Contacting Replicate...");
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             {
-                input: {
-                    target_image: targetImageUrl,
-                    swap_image: userCloudinaryUrl
-                }
+                input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl }
             }
         );
 
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            console.log("🌊 [AI] Processing Stream to Cloudinary...");
+            console.log("🌊 [AI] Processing Stream...");
             const chunks = [];
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
@@ -120,32 +135,21 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // 7. API ROUTES
 
-// Health Check Route (Very useful for monitoring)
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: "OK", message: "Server is running smoothly" });
-});
-
 // ROUTE 1: AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
     let localFilePath = req.file ? req.file.path : null;
     try {
         const { category, gender } = req.body;
         if (!localFilePath || !category || !gender) {
-            return res.status(400).json({ success: false, error: "Missing required info (image, category, or gender)!" });
+            return res.status(400).json({ success: false, error: "Missing required info!" });
         }
 
         console.log(`🚀 [UPLOAD] Processing: ${category} | ${gender}`);
-
-        // 1. Upload Selfie
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
-        
-        // 2. Run AI
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
-        // 3. Cleanup
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
 
-        console.log("✅ [UPLOAD] Success! Image ready.");
         res.json({ success: true, ai_image_url: finalAiImageUrl });
     } catch (error) {
         console.error("❌ [UPLOAD ERROR]:", error.message);
@@ -154,72 +158,65 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// ROUTE 2: Razorpay Order
+// ROUTE 2: Razorpay Order (UPDATED WITH MONGODB)
 app.post('/create-order', async (req, res) => {
+    const { category, gender, aiImageUrl } = req.body; // Frontend se ye data aayega
     console.log("💰 [PAYMENT] Create Order Request Received!");
 
-    if (!razorpay) {
-        console.error("❌ [PAYMENT ERROR] Razorpay instance not available!");
-        return res.status(500).json({ success: false, error: "Payment system is offline." });
-    }
+    if (!razorpay) return res.status(500).json({ success: false, error: "Payment system offline." });
 
     try {
-        const options = { 
-            amount: 5000, // ₹50.00
-            currency: "INR", 
-            receipt: `rcpt_${Date.now()}` 
-        };
-
-        console.log("📡 [PAYMENT] Contacting Razorpay...");
+        const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
         const order = await razorpay.orders.create(options);
-        
-        console.log("✅ [PAYMENT] Order Created:", order.id);
-        res.json(order);
 
-    } catch (error) {
-        console.error("❌ [RAZORPAY API ERROR]:", error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message || "Razorpay failed to create order." 
+        // --- NEW: Save to MongoDB ---
+        await Order.create({
+            category,
+            gender,
+            aiImageUrl,
+            razorpayOrderId: order.id,
+            status: 'pending'
         });
-    }
-});
+        console.log("✅ [DATABASE] Pending Order Saved:", order.id);
 
-// ROUTE 3: Razorpay Verification
-app.post('/verify-payment', async (req, res) => {
-    console.log("🔐 [PAYMENT] Verifying Signature...");
-    try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-        
-        if (!process.env.RAZORPAY_KEY_SECRET) {
-            throw new Error("Server configuration error: Razorpay Secret missing.");
-        }
-
-        const body = razorpay_order_id + "|" + razorpay_payment_id;
-        const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body.toString())
-            .digest("hex");
-
-        if (expectedSignature === razorpay_signature) {
-            console.log("✅ [PAYMENT] Verified Successfully!");
-            res.json({ success: true });
-        } else {
-            console.warn("⚠️ [PAYMENT] Signature mismatch detected!");
-            res.status(400).json({ success: false, error: "Verification failed: Invalid signature." });
-        }
+        res.json(order);
     } catch (error) {
-        console.error("❌ [VERIFICATION ERROR]:", error.message);
+        console.error("❌ [RAZORPAY ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 8. GLOBAL ERROR HANDLER (The "Anti-Crash" Shield)
+// ROUTE 3: Razorpay Verification (UPDATED WITH MONGODB)
+app.post('/verify-payment', async (req, res) => {
+    console.log("🔐 [PAYMENT] Verifying Signature...");
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+        const body = razorpay_order_id + "|" + razorpay_payment_id;
+        const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString()).digest("hex");
+
+        if (expectedSignature === razorpay_signature) {
+            // --- NEW: Update MongoDB Status ---
+            await Order.findOneAndUpdate(
+                { razorpayOrderId: razorpay_order_id },
+                { status: 'completed', razorpayPaymentId: razorpay_payment_id }
+            );
+            console.log("✅ [DATABASE] Order Marked as Completed!");
+            res.json({ success: true });
+        } else {
+            console.warn("⚠️ [PAYMENT] Signature Mismatch!");
+            res.status(400).json({ success: false, error: "Verification failed" });
+        }
+    } catch (error) {
+        console.error("❌ [VERIFICATION ERROR]:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 8. GLOBAL ERROR HANDLER
 app.use((err, req, res, next) => {
     console.error("💥 [CRITICAL SYSTEM ERROR]:", err.stack);
-    res.status(500).json({ 
-        success: false, 
-        error: "A critical server error occurred. Check logs." 
-    });
+    res.status(500).json({ success: false, error: "Internal Server Error" });
 });
 
 // 9. Start Server
