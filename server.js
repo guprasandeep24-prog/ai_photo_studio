@@ -11,23 +11,27 @@ const crypto = require('crypto');
 
 const app = express();
 
-// 1. Initialization & Debugging Check
-console.log("🛠️ Initializing AI Studio Server...");
+// 1. Initialization & Deep Debugging
+console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
 
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// Razorpay Initialization with Error Safety
+// Razorpay Initialization with extreme safety
 let razorpay;
 try {
-    razorpay = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-    console.log("✅ Razorpay Initialized Successfully");
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+        console.error("❌ [CRITICAL] Razorpay Keys are MISSING in Environment Variables!");
+    } else {
+        razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+        console.log("✅ [SYSTEM] Razorpay Initialized Successfully");
+    }
 } catch (err) {
-    console.error("❌ CRITICAL: Razorpay Initialization Failed:", err.message);
+    console.error("❌ [CRITICAL] Razorpay Initialization Failed:", err.message);
 }
 
 // 2. Middleware
@@ -78,11 +82,11 @@ const TEMPLATES = {
 
 // 6. AI Engine Logic
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
-    console.log(`🤖 AI STARTING: ${category} for ${gender}...`);
+    console.log(`🤖 [AI] Starting: ${category} for ${gender}...`);
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
 
     try {
-        console.log("📡 Contacting Replicate...");
+        console.log("📡 [AI] Contacting Replicate API...");
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             {
@@ -94,7 +98,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
         );
 
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            console.log("🌊 Processing Stream...");
+            console.log("🌊 [AI] Processing Stream to Cloudinary...");
             const chunks = [];
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
@@ -109,12 +113,17 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
         }
         return Array.isArray(output) ? output[0] : output;
     } catch (error) {
-        console.error("❌ AI Error Details:", error.message);
+        console.error("❌ [AI ERROR]:", error.message);
         throw error;
     }
 }
 
 // 7. API ROUTES
+
+// Health Check Route (Very useful for monitoring)
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: "OK", message: "Server is running smoothly" });
+});
 
 // ROUTE 1: AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
@@ -122,32 +131,36 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { category, gender } = req.body;
         if (!localFilePath || !category || !gender) {
-            return res.status(400).json({ success: false, error: "Missing info!" });
+            return res.status(400).json({ success: false, error: "Missing required info (image, category, or gender)!" });
         }
 
-        console.log(`🚀 Request: ${category} | ${gender}`);
+        console.log(`🚀 [UPLOAD] Processing: ${category} | ${gender}`);
 
+        // 1. Upload Selfie
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
+        
+        // 2. Run AI
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
+        // 3. Cleanup
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
 
+        console.log("✅ [UPLOAD] Success! Image ready.");
         res.json({ success: true, ai_image_url: finalAiImageUrl });
     } catch (error) {
-        console.error("❌ Upload Route Error:", error.message);
+        console.error("❌ [UPLOAD ERROR]:", error.message);
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ROUTE 2: Razorpay Order (RE-ENGINEERED FOR STABILITY)
+// ROUTE 2: Razorpay Order
 app.post('/create-order', async (req, res) => {
-    console.log("💰 Razorpay Order Request Received!");
+    console.log("💰 [PAYMENT] Create Order Request Received!");
 
-    // Check if razorpay object exists and has valid keys
-    if (!razorpay || !razorpay.key_id) {
-        console.error("❌ ERROR: Razorpay instance is not properly initialized. Check Environment Variables!");
-        return res.status(500).json({ success: false, error: "Payment system not initialized on server." });
+    if (!razorpay) {
+        console.error("❌ [PAYMENT ERROR] Razorpay instance not available!");
+        return res.status(500).json({ success: false, error: "Payment system is offline." });
     }
 
     try {
@@ -157,61 +170,60 @@ app.post('/create-order', async (req, res) => {
             receipt: `rcpt_${Date.now()}` 
         };
 
-        console.log("📡 Sending request to Razorpay API...");
+        console.log("📡 [PAYMENT] Contacting Razorpay...");
         const order = await razorpay.orders.create(options);
         
-        console.log("✅ Order Created Successfully:", order.id);
+        console.log("✅ [PAYMENT] Order Created:", order.id);
         res.json(order);
 
     } catch (error) {
-        // This will catch everything from network errors to Razorpay API errors
-        console.error("❌ RAZORPAY API ERROR:", error);
+        console.error("❌ [RAZORPAY API ERROR]:", error);
         res.status(500).json({ 
             success: false, 
-            error: error.message || "Razorpay request failed" 
+            error: error.message || "Razorpay failed to create order." 
         });
     }
 });
 
 // ROUTE 3: Razorpay Verification
 app.post('/verify-payment', async (req, res) => {
-    console.log("🔐 Verifying Payment...");
+    console.log("🔐 [PAYMENT] Verifying Signature...");
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-        const body = razorpay_order_id + "|" + razorpay_payment_id;
         
         if (!process.env.RAZORPAY_KEY_SECRET) {
-            throw new Error("RAZORPAY_KEY_SECRET is missing in Environment Variables");
+            throw new Error("Server configuration error: Razorpay Secret missing.");
         }
 
+        const body = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
             .update(body.toString())
             .digest("hex");
 
         if (expectedSignature === razorpay_signature) {
-            console.log("✅ Payment Verified Successfully!");
+            console.log("✅ [PAYMENT] Verified Successfully!");
             res.json({ success: true });
         } else {
-            console.warn("⚠️ Signature Mismatch!");
-            res.status(400).json({ success: false, error: "Verification failed" });
+            console.warn("⚠️ [PAYMENT] Signature mismatch detected!");
+            res.status(400).json({ success: false, error: "Verification failed: Invalid signature." });
         }
     } catch (error) {
-        console.error("❌ VERIFICATION ERROR:", error.message);
+        console.error("❌ [VERIFICATION ERROR]:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 // 8. GLOBAL ERROR HANDLER (The "Anti-Crash" Shield)
 app.use((err, req, res, next) => {
-    console.error("💥 GLOBAL CRITICAL ERROR:", err.stack);
+    console.error("💥 [CRITICAL SYSTEM ERROR]:", err.stack);
     res.status(500).json({ 
         success: false, 
-        error: "Internal Server Error. Check logs for details." 
+        error: "A critical server error occurred. Check logs." 
     });
 });
 
 // 9. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`✅ AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
+    console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
 });
