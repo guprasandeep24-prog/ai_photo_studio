@@ -230,5 +230,43 @@ const orderData = await orderRes.json();
             }
         });
     </script>
+    <!-- Firebase SDKs (Using CDN for GitHub Pages Compatibility) -->
+<script type="module">
+  // 1. Firebase App aur Auth modules ko import kar rahe hain
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+  // 2. Tera Firebase Configuration (Jo tune mujhe bheja tha)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
+    authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
+    projectId: "ai-photo-studio-a8a34",
+    storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
+    messagingSenderId: "416743083671",
+    appId: "1:416743083671:web:7733f0cb7a6afc8667a3d2",
+    measurementId: "G-HRKKHJKDJ8"
+  };
+
+  // 3. Firebase ko initialize kar
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // 4. Global variable bana taaki baaki functions (like generate photo) isse use kar sakein
+  window.auth = auth;
+
+  // 5. User ke login status ko track karne ke liye listener
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      console.log("✅ [AUTH] User is logged in:", user.uid);
+      // Yahan hum user ka UI dikhayenge (jaise Profile pic ya Logout button)
+    } else {
+      console.log("👤 [AUTH] No user is logged in.");
+      // Yahan hum Login/Signup button dikhayenge
+    }
+  });
+
+  // Isse hum window object mein attach kar dete hain taaki baaki functions isse access kar sakein
+  window.firebaseAuth = auth;
+</script>
 </body>
 </html>
