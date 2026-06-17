@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content-width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Photo Studio | Professional AI Transformation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -17,7 +17,20 @@
 
     <!-- Navbar -->
     <nav class="container mx-auto px-6 py-6 flex justify-between items-center">
-        <div class="text-2xl font-bold text-indigo-600">AI <span class="text-slate-800">PhotoStudio</span></div>
+        <div class        text-2xl font-bold text-indigo-600">AI <span class="text-slate-800">PhotoStudio</span></div>
+        
+        <!-- Auth Buttons -->
+        <div id="auth-buttons">
+            <button onclick="toggleAuthModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold hover:bg-indigo-700 transition">
+                Login / Sign Up
+            </button>
+        </div>
+
+        <!-- User Profile -->
+        <div id="user-profile" class="hidden flex items-center gap-4">
+            <span id="user-email" class="text-sm font-medium text-slate-600"></span>
+            <button onclick="handleLogout()" class="text-sm text-red-500 font-bold hover:underline">Logout</button>
+        </div>
     </nav>
 
     <!-- Hero Section -->
@@ -36,7 +49,7 @@
             <div onclick="selectCategory('linkedin')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center">
                 <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-briefcase"></i></div>
                 <h3 class="text-xl font-bold mb-2">LinkedIn</h3>
-                <p class ability="text-slateslate-500 text-sm">Corporate Suits & Office Look</p>
+                <p class="text-slate-500 text-sm">Corporate Suits & Office Look</p>
             </div>
             <div onclick="selectCategory('wedding')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center">
                 <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-crown"></i></div>
@@ -106,7 +119,131 @@
         </div>
     </div>
 
+    <!-- Auth Modal -->
+    <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
+        <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative">
+            <button onclick="toggleAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 id="auth-title" class="text-3xl font-bold text-slate-900 mb-2 text-center">Welcome Back</h2>
+            <p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Login to your account to continue</p>
+            <form id="authForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                    <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition">
+                </div>
+                <button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition mt-4">
+                    Login
+                </button>
+            </form>
+            <div class="mt-6 text-center text-sm text-slate-500">
+                <span id="auth-toggle-text">Don't have an account?</span>
+                <button onclick="switchAuthMode()" id="auth-switch-btn" class="text-indigo-600 font-bold hover:underline ml-1">Sign Up</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    
+    <!-- Firebase SDKs (Using CDN for GitHub Pages) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
+            authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
+            projectId: "ai-photo-studio-a8a34",
+            storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
+            messagingSenderId: "416743083671",
+            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
+            measurementId: "G-HRKKHJKDJ8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        window.auth = auth; // Expose to global scope
+
+        // --- AUTH LOGIC ---
+        let isLoginMode = true;
+
+        window.toggleAuthModal = function() {
+            document.getElementById('authModal').classList.toggle('hidden');
+        };
+
+        window.switchAuthMode = function() {
+            isLoginMode = !isLoginMode;
+            const title = document.getElementById('auth-title');
+            const subtitle = document.getElementById('auth-subtitle');
+            const btn = document.getElementById('authSubmitBtn');
+            const toggleText = document.getElementById('auth-toggle-text');
+            const switchBtn = document.getElementById('auth-switch-btn');
+
+            if (isLoginMode) {
+                title.innerText = "Welcome Back";
+                subtitle.innerText = "Login to your account to continue";
+                btn.innerText = "Login";
+                toggleText.innerText = "Don't have an account?";
+                switchBtn.innerText = "Sign Up";
+            } else {
+                title.innerText = "Create Account";
+                subtitle.innerText = "Join us to start generating AI photos";
+                btn.innerText = "Sign Up";
+                toggleText.innerText = "Already have an account?";
+                switchBtn.innerText = "Login";
+            }
+        };
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            try {
+                if (isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                }
+                toggleAuthModal();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+
+        window.handleLogout = async function() {
+            await signOut(auth);
+            location.reload();
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            const authButtons = document.getElementById('auth-buttons');
+            const userProfile = document.getElementById('user-profile');
+            const userEmailSpan = document.getElementById('user-email');
+
+            if (user) {
+                authButtons.classList.add('hidden');
+                userProfile.classList.remove('hidden');
+                userEmailSpan.innerText = user.email;
+            } else {
+                authButtons.classList.remove('hidden');
+                userProfile.classList.add('hidden');
+            }
+        });
+    </script>
+
+    <!-- Main App Logic (Non-Module) -->
     <script>
         let selectedCategory = "";
         let selectedGender = "";
@@ -163,28 +300,22 @@
                 const aiResult = await aiRes.json();
 
                 if (!aiResult.success) throw new Error(aiResult.error || "AI Generation failed");
-
                 const aiImageUrl = aiResult.ai_image_url;
-                console.log("Step 1 Success:", aiImageUrl);
 
-                // --- STEP B: Razorpay Payment Trigger ---
-console.log("Step 2: Triggering Razorpay...");
+                // STEP 2: Razorpay Order
+                console.log("Step 2: Triggering Razorpay...");
+                const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: selectedCategory,
+                        gender: selectedGender,
+                        aiImageUrl: aiImageUrl
+                    })
+                });
 
-// 1. Pehle backend se Order ID mangiye + Data bhejiye
-const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, // JSON bhejna zaroori hai
-    body: JSON.stringify({
-        category: selectedCategory,
-        gender: selectedGender,
-        aiImageUrl: aiImageUrl // Jo Step 1 se mila
-    })
-});
-
-if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
-const orderData = await orderRes.json();
-
-// ... (baaki ka Razorpay popup wala code same rahega)
+                if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
+                const orderData = await orderRes.json();
 
                 // STEP 3: Razorpay Checkout
                 const options = {
@@ -230,43 +361,5 @@ const orderData = await orderRes.json();
             }
         });
     </script>
-    <!-- Firebase SDKs (Using CDN for GitHub Pages Compatibility) -->
-<script type="module">
-  // 1. Firebase App aur Auth modules ko import kar rahe hain
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-  // 2. Tera Firebase Configuration (Jo tune mujhe bheja tha)
-  const firebaseConfig = {
-    apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
-    authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
-    projectId: "ai-photo-studio-a8a34",
-    storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
-    messagingSenderId: "416743083671",
-    appId: "1:416743083671:web:7733f0cb7a6afc8667a3d2",
-    measurementId: "G-HRKKHJKDJ8"
-  };
-
-  // 3. Firebase ko initialize kar
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-
-  // 4. Global variable bana taaki baaki functions (like generate photo) isse use kar sakein
-  window.auth = auth;
-
-  // 5. User ke login status ko track karne ke liye listener
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      console.log("✅ [AUTH] User is logged in:", user.uid);
-      // Yahan hum user ka UI dikhayenge (jaise Profile pic ya Logout button)
-    } else {
-      console.log("👤 [AUTH] No user is logged in.");
-      // Yahan hum Login/Signup button dikhayenge
-    }
-  });
-
-  // Isse hum window object mein attach kar dete hain taaki baaki functions isse access kar sakein
-  window.firebaseAuth = auth;
-</script>
 </body>
 </html>
