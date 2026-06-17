@@ -10,6 +10,8 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
+const Order = require('./models/Order');
+
 const app = express();
 
 // 1. Initialization
