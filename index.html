@@ -147,11 +147,11 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Sabse niche wala poora script block replace kar de -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     
-    <!-- Firebase SDKs (Using CDN for GitHub Pages) -->
     <script type="module">
+        // 1. Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { 
             getAuth, 
@@ -161,6 +161,7 @@
             signOut 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+        // 2. Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
             authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
@@ -173,16 +174,37 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        window.auth = auth; // Expose to global scope
 
-        // --- AUTH LOGIC ---
+        // 3. Global Variables
+        let selectedCategory = "";
+        let selectedGender = "";
+        let selectedFile = null;
         let isLoginMode = true;
 
-        window.toggleAuthModal = function() {
+        // 4. Expose functions to Window (Taaki HTML onclick inhe dhund sake)
+        window.auth = auth;
+
+        window.selectCategory = (cat) => {
+            selectedCategory = cat;
+            selectedGender = "";
+            document.getElementById('btn-man').classList.remove('active');
+            document.getElementById('btn-woman').classList.remove('active');
+            document.getElementById('upload-section').classList.remove('hidden');
+            document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
+            document.getElementById('upload-section.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.selectGender = (gender) => {
+            selectedGender = gender;
+            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
+            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+        };
+
+        window.toggleAuthModal = () => {
             document.getElementById('authModal').classList.toggle('hidden');
         };
 
-        window.switchAuthMode = function() {
+        window.switchAuthMode = () => {
             isLoginMode = !isLoginMode;
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
@@ -205,11 +227,16 @@
             }
         };
 
+        window.handleLogout = async () => {
+            await signOut(auth);
+            location.reload();
+        };
+
+        // 5. Auth Form Logic
         document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('authEmail').value;
             const password = document.getElementById('authPassword').value;
-
             try {
                 if (isLoginMode) {
                     await signInWithEmailAndPassword(auth, email, password);
@@ -218,15 +245,11 @@
                 }
                 toggleAuthModal();
             } catch (error) {
-                alert("Error: " + error.message);
+                alert("Auth Error: " + error.message);
             }
         });
 
-        window.handleLogout = async function() {
-            await signOut(auth);
-            location.reload();
-        };
-
+        // 6. Auth State Listener (UI Update)
         onAuthStateChanged(auth, (user) => {
             const authButtons = document.getElementById('auth-buttons');
             const userProfile = document.getElementById('user-profile');
@@ -239,6 +262,103 @@
             } else {
                 authButtons.classList.remove('hidden');
                 userProfile.classList.add('hidden');
+            }
+        });
+
+        // 7. Main App Logic (Image Upload & Payment)
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.getElementById('imagePreview').src = event.target.result;
+                    document.getElementById('preview-container').classList.remove('hidden');
+                    document.getElementById('submitBtn').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            if (!selectedGender) return alert("Please select Gender!");
+            if (!selectedFile) return alert("Please select an image!");
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('category', selectedCategory);
+            formData.append('gender', selectedGender);
+
+            document.getElementById('loadingModal').classList.remove('hidden');
+
+            try {
+                // STEP 1: AI Generation
+                console.log("Step 1: Starting AI Generation...");
+                const aiRes = await fetch('https://ai-photo-studio-e3so.onrender.com/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const aiResult = await aiRes.json();
+                if (!aiResult.success) throw new Error(aiResult.error || "AI Generation failed");
+                const aiImageUrl = aiResult.ai_image_url;
+
+                // STEP 2: Razorpay Order
+                console.log("Step 2: Triggering Razorpay...");
+                const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: selectedCategory,
+                        gender: selectedGender,
+                        aiImageUrl: aiImageUrl,
+                        userId: auth.currentUser ? auth.currentUser.uid : "guest" // AB YE ERROR NAHI DEGA!
+                    })
+                });
+
+                if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
+                const orderData = await orderRes.json();
+
+                // STEP 3: Razorpay Checkout
+                const options = {
+                    "key": "rzp_test_T0igS1UI99gp4v", 
+                    "amount": orderData.amount,
+                    "currency": "INR",
+                    "name": "AI Photo Studio",
+                    "description": "Premium AI Photo Generation",
+                    "order_id": orderData.id,
+                    "handler": async function (response) {
+                        console.log("Verifying payment...");
+                        const verifyRes = await fetch('https://ai-photo-studio-e3so.onrender.com/verify-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature
+                            })
+                        });
+
+                        const verifyResult = await verifyRes.json();
+                        if (verifyResult.success) {
+                            document.getElementById('resultImage').src = aiImageUrl;
+                            document.getElementById('downloadBtn').href = aiImageUrl;
+                            document.getElementById('successModal').classList.remove('hidden');
+                        } else {
+                            alert("Payment Verification Failed!");
+                        }
+                    },
+                    "prefill": { "name": "", "email": "" },
+                    "theme": { "color": "#4f46e5" }
+                };
+
+                const rzp = new Razorpay(options);
+                rzp.open();
+                document.getElementById('loadingModal').classList.add('hidden');
+
+            } catch (error) {
+                console.error("Error flow:", error);
+                alert("Error: " + error.message);
+                document.getElementById('loadingModal').classList.add('hidden');
             }
         });
     </script>
