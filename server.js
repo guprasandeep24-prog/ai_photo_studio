@@ -10,6 +10,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
+// Import Order Model
 const Order = require('./models/Order');
 
 const app = express();
@@ -17,11 +18,9 @@ const app = express();
 // 1. Initialization
 console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
 
-// --- SINGLE MONGODB CONNECTION (No Duplicates!) ---
-const mongoURI = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : "";
-mongoose.connect(mongoURI)
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
-    .catch(err => console.error("❌ [DATABASE] Connection Error:", err.message));
+    .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
 
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
@@ -29,15 +28,11 @@ const replicate = new Replicate({
 
 let razorpay;
 try {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        console.error("❌ [CRITICAL] Razorpay Keys are MISSING!");
-    } else {
-        razorpay = new Razorpay({
-            key_id: process.env.RAZORPAY_KEY_ID,
-            key_secret: process.env.RAZORPAY_KEY_SECRET,
-        });
-        console.log("✅ [SYSTEM] Razorpay Initialized Successfully");
-    }
+    razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    console.log("✅ [SYSTEM] Razorpay Initialized Successfully");
 } catch (err) {
     console.error("❌ [CRITICAL] Razorpay Initialization Failed:", err.message);
 }
@@ -90,20 +85,14 @@ const TEMPLATES = {
 
 // 6. AI Engine Logic
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
-    console.log(`🤖 [AI] Starting: ${category} for ${gender}...`);
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-
     try {
-        console.log("📡 [AI] Contacting Replicate...");
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
-            {
-                input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl }
-            }
+            { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            console.log("🌊 [AI] Processing Stream...");
             const chunks = [];
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
@@ -130,27 +119,22 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     let localFilePath = req.file ? req.file.path : null;
     try {
         const { category, gender } = req.body;
-        if (!localFilePath || !category || !gender) {
-            return res.status(400).json({ success: false, error: "Missing info!" });
-        }
+        if (!localFilePath || !category || !gender) return res.status(400).json({ success: false, error: "Missing info!" });
 
-        console.log(`🚀 [UPLOAD] Processing: ${category} | ${gender}`);
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-
         res.json({ success: true, ai_image_url: finalAiImageUrl });
     } catch (error) {
-        console.error("❌ [UPLOAD ERROR]:", error.message);
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ROUTE 2: Razorpay Order
+// ROUTE 2: Razorpay Order (UPDATED)
 app.post('/create-order', async (req, res) => {
-    const { category, gender, aiImageUrl } = req.body; 
+    const { category, gender, aiImageUrl, userId } = req.body; // Frontend se userId aayegi
     console.log("💰 [PAYMENT] Create Order Request Received!");
 
     if (!razorpay) return res.status(500).json({ success: false, error: "Payment system offline." });
@@ -159,26 +143,24 @@ app.post('/create-order', async (req, res) => {
         const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
         const order = await razorpay.orders.create(options);
 
-        // Save to DB
+        // Save to MongoDB with userId
         await Order.create({
+            userId, 
             category,
             gender,
             aiImageUrl,
             razorpayOrderId: order.id,
             status: 'pending'
         });
-        console.log("✅ [DATABASE] Order Saved:", order.id);
 
         res.json(order);
     } catch (error) {
-        console.error("❌ [RAZORPAY ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ROUTE 3: Razorpay Verification
+// ROUTE 3: Razorpay Verification (UPDATED)
 app.post('/verify-payment', async (req, res) => {
-    console.log("🔐 [PAYMENT] Verifying Signature...");
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -190,13 +172,25 @@ app.post('/verify-payment', async (req, res) => {
                 { razorpayOrderId: razorpay_order_id },
                 { status: 'completed', razorpayPaymentId: razorpay_payment_id }
             );
-            console.log("✅ [DATABASE] Order Marked as Completed!");
             res.json({ success: true });
         } else {
             res.status(400).json({ success: false, error: "Verification failed" });
         }
     } catch (error) {
-        console.error("❌ [VERIFICATION ERROR]:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ROUTE 4: Get User Photos (NEW ROUTE for Dashboard)
+app.get('/my-photos', async (req, res) => {
+    try {
+        const { userId } = req.query;
+        if (!userId) return res.status(400).json({ success: false, error: "User ID required" });
+
+        // Sirf wahi photos lao jo completed hain aur us user ki hain
+        const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
+        res.json(photos);
+    } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });

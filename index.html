@@ -302,57 +302,61 @@
                 if (!aiResult.success) throw new Error(aiResult.error || "AI Generation failed");
                 const aiImageUrl = aiResult.ai_image_url;
 
-                // STEP 2: Razorpay Order
-                console.log("Step 2: Triggering Razorpay...");
-                const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        category: selectedCategory,
-                        gender: selectedGender,
-                        aiImageUrl: aiImageUrl
-                    })
-                });
+            // --- STEP B: Razorpay Payment Trigger (UPDATED) ---
+console.log("Step 2: Triggering Razorpay...");
 
-                if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
-                const orderData = await orderRes.json();
+// 1. Pehle backend se Order ID mangiye + User ID + AI Image URL bhejiye
+const orderRes = await fetch('https://ai-photo-studio-e3so.onrender.com/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        category: selectedCategory,
+        gender: selectedGender,
+        aiImageUrl: aiImageUrl,
+        userId: window.firebaseAuth.currentUser ? window.firebaseAuth.currentUser.uid : "guest" 
+    })
+});
 
-                // STEP 3: Razorpay Checkout
-                const options = {
-                    "key": "rzp_test_T0igS1UI99gp4v", 
-                    "amount": orderData.amount,
-                    "currency": "INR",
-                    "name": "AI Photo Studio",
-                    "description": "Premium AI Photo Generation",
-                    "order_id": orderData.id,
-                    "handler": async function (response) {
-                        console.log("Verifying payment...");
-                        const verifyRes = await fetch('https://ai-photo-studio-e3so.onrender.com/verify-payment', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature
-                            })
-                        });
+if (!orderRes.ok) throw new Error("Failed to create Razorpay order");
+const orderData = await orderRes.json();
 
-                        const verifyResult = await verifyRes.json();
-                        if (verifyResult.success) {
-                            document.getElementById('resultImage').src = aiImageUrl;
-                            document.getElementById('downloadBtn').href = aiImageUrl;
-                            document.getElementById('successModal').classList.remove('hidden');
-                        } else {
-                            alert("Payment Verification Failed!");
-                        }
-                    },
-                    "prefill": { "name": "", "email": "" },
-                    "theme": { "color": "#4f46e5" }
-                };
+// 2. Razorpay Checkout
+const options = {
+    "key": "rzp_test_T0igS1UI99gp4v", 
+    "amount": orderData.amount,
+    "currency": "INR",
+    "name": "AI Photo Studio",
+    "description": "Premium AI Photo Generation",
+    "order_id": orderData.id,
+    "handler": async function (response) {
+        console.log("Verifying payment...");
+        const verifyRes = await fetch('https://ai-photo-studio-e3so.onrender.com/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+            })
+        });
 
-                const rzp = new Razorpay(options);
-                rzp.open();
-                document.getElementById('loadingModal').classList.add('hidden');
+        const verifyResult = await verifyRes.json();
+        if (verifyResult.success) {
+            // SUCCESS!
+            document.getElementById('resultImage').src = aiImageUrl;
+            document.getElementById('downloadBtn').href = aiImageUrl;
+            document.getElementById('successModal').classList.remove('hidden');
+        } else {
+            alert("Payment Verification Failed!");
+        }
+    },
+    "prefill": { "name": "", "email": "" },
+    "theme": { "color": "#4f46e5" }
+};
+
+const rzp = new Razorpay(options);
+rzp.open();
+document.getElementById('loadingModal').classList.add('hidden');
 
             } catch (error) {
                 console.error("Error flow:", error);
