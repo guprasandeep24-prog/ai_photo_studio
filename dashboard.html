@@ -80,11 +80,11 @@
         async function loadDashboard() {
             try {
                 // 1. Fetch Profile (For Credits)
-                const profileRes = await fetch(`http://localhost:5000/user-profile/${MY_USER_ID}`);
+                const profileRes = await fetch(`https://ai-photo-e3so.onrender.com/user-profile/${MY_USER_ID}`);
                 const profileData = await profileRes.json();
 
                 // 2. Fetch Photos
-                const res = await fetch(`http://localhost:5000/my-photos?userId=${MY_USER_ID}`);
+                const res = await fetch(`https://ai-photo-e3so.onrender.com/my-photos?userId=${MY_USER_ID}`);
                 const photos = await res.json();
 
                 loader.classList.add('hidden');

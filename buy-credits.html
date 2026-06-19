@@ -57,7 +57,7 @@
 
             try {
                 // 1. Backend se Order ID mangwana
-                const res = await fetch('http://localhost:5000/api/payments/create-order', {
+                const res = await fetch('https://ai-photo-e3so.onrender.com/api/payments/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ planName: planName })
@@ -78,7 +78,7 @@
                         status.innerText = "🛡️ Verifying payment...";
                         
                         // 3. Payment Verify karna
-                        const verifyRes = await fetch('http://localhost:5000/api/payments/verify-payment', {
+                        const verifyRes = await fetch('https://ai-photo-e3so.onrender.com/api/payments/verify-payment', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
