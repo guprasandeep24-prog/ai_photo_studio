@@ -30,8 +30,10 @@ const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// Middleware
-app.use(cors()); // Sab kuch allow karne ke liye (Testing ke liye best)
+// 2. Middleware
+// TESTING KE LIYE: Isse sab allow ho jayega, isliye CORS error nahi aayega
+app.use(cors()); 
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
