@@ -6,55 +6,44 @@ const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
 const mongoose = require('mongoose');
 
-// Import Order Model
+// 1. Models Import
 const Order = require('./models/Order');
+const User = require('./models/User'); 
+
+// 2. Routes Import
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// 1. Initialization
+// 3. Initialization & Middleware
 console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
 
+// Database Connection
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
 
+// Replicate Setup
 const replicate = new Replicate({
     auth: process.env.REPLICATE_API_TOKEN,
 });
 
-let razorpay;
-try {
-    razorpay = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-    console.log("✅ [SYSTEM] Razorpay Initialized Successfully");
-} catch (err) {
-    console.error("❌ [CRITICAL] Razorpay Initialization Failed:", err.message);
-}
-
-// 2. Middleware
-app.use(cors({
-    origin: 'https://guprasandeep24-prog.github.io', 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-}));
+// Middleware
+app.use(cors()); // Sab kuch allow karne ke liye (Testing ke liye best)
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
 
-// 3. Cloudinary Configuration
+// 4. Cloudinary Configuration
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 4. Multer Setup
+// 5. Multer Setup
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -67,7 +56,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// 5. Templates Map
+// 6. Templates Map
 const TEMPLATES = {
     'linkedin': {
         'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/smiling-businessman-with-arms-crossed_dalfak.jpg', 
@@ -83,7 +72,7 @@ const TEMPLATES = {
     }
 };
 
-// 6. AI Engine Logic
+// 7. AI Engine Logic
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     try {
@@ -112,82 +101,65 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     }
 }
 
-// 7. API ROUTES
+// 8. API ROUTES
 
 // ROUTE 1: AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
     let localFilePath = req.file ? req.file.path : null;
     try {
-        const { category, gender } = req.body;
-        if (!localFilePath || !category || !gender) return res.status(400).json({ success: false, error: "Missing info!" });
+        const { category, gender, userId } = req.body;
+        if (!localFilePath || !category || !gender || !userId) {
+            return res.status(400).json({ success: false, error: "Missing info or User ID!" });
+        }
+
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user || user.credits < 1) {
+            return res.status(402).json({ success: false, error: "Insufficient credits!" });
+        }
 
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
-        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-        res.json({ success: true, ai_image_url: finalAiImageUrl });
-    } catch (error) {
-        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+        user.credits -= 1;
+        await user.save();
 
-// ROUTE 2: Razorpay Order (UPDATED)
-app.post('/create-order', async (req, res) => {
-    const { category, gender, aiImageUrl, userId } = req.body; // Frontend se userId aayegi
-    console.log("💰 [PAYMENT] Create Order Request Received!");
-
-    if (!razorpay) return res.status(500).json({ success: false, error: "Payment system offline." });
-
-    try {
-        const options = { amount: 5000, currency: "INR", receipt: `rcpt_${Date.now()}` };
-        const order = await razorpay.orders.create(options);
-
-        // Save to MongoDB with userId
         await Order.create({
-            userId, 
+            userId,
             category,
             gender,
-            aiImageUrl,
-            razorpayOrderId: order.id,
-            status: 'pending'
+            aiImageUrl: finalAiImageUrl,
+            status: 'completed',
+            razorpayOrderId: 'N/A'
         });
 
-        res.json(order);
+        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+        res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
+
     } catch (error) {
+        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ROUTE 3: Razorpay Verification (UPDATED)
-app.post('/verify-payment', async (req, res) => {
+// ROUTE 2: Payment Routes
+app.use('/api/payments', paymentRoutes);
+
+// ROUTE 3: Get User Profile (For Credits)
+app.get('/user-profile/:userId', async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-        const body = razorpay_order_id + "|" + razorpay_payment_id;
-        const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body.toString()).digest("hex");
-
-        if (expectedSignature === razorpay_signature) {
-            await Order.findOneAndUpdate(
-                { razorpayOrderId: razorpay_order_id },
-                { status: 'completed', razorpayPaymentId: razorpay_payment_id }
-            );
-            res.json({ success: true });
-        } else {
-            res.status(400).json({ success: false, error: "Verification failed" });
-        }
+        const user = await User.findOne({ firebaseUid: req.params.userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        res.json({ success: true, credits: user.credits, email: user.email });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ROUTE 4: Get User Photos (NEW ROUTE for Dashboard)
+// ROUTE 4: Get User Photos
 app.get('/my-photos', async (req, res) => {
     try {
         const { userId } = req.query;
         if (!userId) return res.status(400).json({ success: false, error: "User ID required" });
-
-        // Sirf wahi photos lao jo completed hain aur us user ki hain
         const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
     } catch (error) {
@@ -195,13 +167,13 @@ app.get('/my-photos', async (req, res) => {
     }
 });
 
-// 8. GLOBAL ERROR HANDLER
+// 9. Global Error Handler
 app.use((err, req, res, next) => {
     console.error("💥 [CRITICAL ERROR]:", err.stack);
     res.status(500).json({ success: false, error: "Internal Server Error" });
 });
 
-// 9. Start Server
+// 10. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);

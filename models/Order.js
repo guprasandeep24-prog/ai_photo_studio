@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const OrderSchema = new mongoose.Schema({
-    userId: { type: String, required: true }, // Firebase UID yahan save hogi
+    userId: { type: String, required: true }, // Firebase UID
     category: { type: String, required: true },
     gender: { type: String, required: true },
     aiImageUrl: { type: String, required: true },

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My AI Gallery | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-900 text-white min-h-screen font-sans">
+
+    <!-- Navbar -->
+    <nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 p-2 rounded-lg">
+                    <i class="fas fa-magic text-white"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">AI Photo Studio</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="bg-gray-700 px-4 py-1.5 rounded-full flex items-center gap-2 border border-gray-600">
+                    <i class="fas fa-coins text-yellow-400"></i>
+                    <span id="credit-count" class="font-bold text-sm text-yellow-400">Loading...</span>
+                </div>
+                <button onclick="location.href='index.html'" class="text-gray-400 hover:text-white transition">
+                    <i class="fas fa-home text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <header class="container mx-auto mt-8 px-4">
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 shadow-xl flex flex-col md:flex-row justify-between items-center">
+            <div>
+                <h2 class="text-3xl font-extrabold mb-2">Welcome Back! 👋</h2>
+                <p class="text-blue-100">Your AI creations are ready to shine.</p>
+            </div>
+            <div class="mt-6 md:mt-0">
+                <button onclick="location.href='buy-credits.html'" class="bg-white text-blue-600 font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-50 transition flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Get More Credits
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-6 mt-4">
+        <div class="flex justify-between items-center mb-8">
+            <h3 class="text-2xl font-semibold">My AI Gallery</h3>
+            <span id="photo-count" class="text-gray-400 text-sm">0 Photos</span>
+        </div>
+
+        <div id="loader" class="flex flex-col items-center justify-center py-20">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <p class="mt-4 text-gray-500">Fetching your magic...</p>
+        </div>
+
+        <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
+            <div class="bg-gray-800 p-6 rounded-full mb-4">
+                <i class="fas fa-image text-5xl text-gray-600"></i>
+            </div>
+            <h3 class="text-xl font-medium text-gray-400">No photos yet!</h3>
+            <p class="text-gray-500 mb-6">Start generating your professional AI photos.</p>
+            <a href="index.html" class="bg-blue-600 px-6 py-2 rounded-lg hover:bg-blue-500 transition">Generate Now</a>
+        </div>
+    </main>
+
+    <script>
+        // ⚠️ IMPORTANT: YAHAN APNA USER ID DAALEIN (Firebase UID)
+        const MY_USER_ID = "nSVQauCvs7SvzNXKh30sqkpu3xB3"; 
+
+        const galleryGrid = document.getElementById('gallery-grid');
+        const loader = document.getElementById('loader');
+        const emptyState = document.getElementById('empty-state');
+        const photoCountLabel = document.getElementById('photo-count');
+        const creditCountLabel = document.getElementById('credit-count');
+
+        async function loadDashboard() {
+            try {
+                // 1. Fetch Profile (For Credits)
+                const profileRes = await fetch(`http://localhost:5000/user-profile/${MY_USER_ID}`);
+                const profileData = await profileRes.json();
+
+                // 2. Fetch Photos
+                const res = await fetch(`http://localhost:5000/my-photos?userId=${MY_USER_ID}`);
+                const photos = await res.json();
+
+                loader.classList.add('hidden');
+
+                // Update Credits
+                if (profileData.success) {
+                    creditCountLabel.innerText = `Credits: ${profileData.credits}`;
+                } else {
+                    creditCountLabel.innerText = "Credits: 0";
+                }
+
+                // Show Photos
+                if (!photos || photos.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    photoCountLabel.innerText = "0 Photos";
+                    return;
+                }
+
+                photoCountLabel.innerText = `${photos.length} Photos`;
+                galleryGrid.innerHTML = '';
+
+                photos.forEach(photo => {
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
+                    card.innerHTML = `
+                        <div class="relative overflow-hidden">
+                            <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover" alt="AI Photo">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3">
+                                <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">
+                                    View Full
+                                </a>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
+                                <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    `;
+                    galleryGrid.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error(error);
+                loader.classList.add('hidden');
+                galleryGrid.innerHTML = `<p class="col-span-full text-center text-red-500">Error: ${error.message}</p>`;
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
