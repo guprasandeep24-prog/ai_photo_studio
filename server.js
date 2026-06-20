@@ -119,5 +119,11 @@ app.use((err, req, res, next) => {
     res.status(500).json({ success: false, error: "Internal Server Error" });
 });
 
+// 10. Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`));
+
+// DHAYAN DEIN: '0.0.0.0' likhna bahut zaroori hai Render ke liye!
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
+    console.log(`🚀 PUBLIC URL: https://ai-photo-e3so.onrender.com`);
+});
