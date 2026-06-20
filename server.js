@@ -128,6 +128,15 @@ app.get('/my-photos', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+// 🚀 DEBUGGING: Check if routes are actually registered
+console.log("🔍 CURRENT ACTIVE ROUTES:");
+console.log("---");
+console.log("1. POST /upload");
+console.log("2. GET  /user-profile/:userId");
+console.log("3. GET  /my-photos");
+console.log("4. POST /api/payments/create-order");
+console.log("5. POST /api/payments/verify-payment");
+console.log("---");
 
 // 🛠️ DEBUGGING: Print all registered routes on startup
 app.listen(process.env.PORT || 5000, () => {
