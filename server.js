@@ -75,7 +75,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 // 🚀 ROUTE 1: AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
     console.log("📥 [UPLOAD] Received request for /upload");
-    let localFilePath = req.file ? req.file.path : null;
+    let localFilePath = req.file ? req.file.path : null; 
     try {
         const { category, gender, userId } = req.body;
         if (!localFilePath || !category || !gender || !userId) {
