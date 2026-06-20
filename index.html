@@ -171,248 +171,236 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { 
-            getAuth, 
-            onAuthStateChanged, 
-            createUserWithEmailAndPassword, 
-            signInWithEmailAndPassword, 
-            signOut 
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { 
+        getAuth, 
+        onAuthStateChanged, 
+        createUserWithEmailAndPassword, 
+        signInWithEmailAndPassword, 
+        signOut 
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
-            authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
-            projectId: "ai-photo-studio-a8a34",
-            storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
-            messagingSenderId: "416743083671",
-            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
-            measurementId: "G-HRKKHJKDJ8"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
+        authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
+        projectId: "ai-photo-studio-a8a34",
+        storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
+        messagingSenderId: "416743083671",
+        appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
+        measurementId: "G-HRKKHJKDJ8"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
-        // --- GLOBAL VARIABLES ---
-        window.selectedCategory = "";
-        window.selectedGender = "";
-        window.selectedFile = null; 
-        window.isLoginMode = true; 
-        const BASE_URL = "https://ai-photo-e3so.onrender.com"; // Render URL
+    // 🚀 SABSE IMPORTANT: Render ka URL yahan hai
+    const BASE_URL = "https://ai-photo-e3so.onrender.com";
 
-        // --- 1. AUTH FUNCTIONS ---
-        window.toggleAuthModal = () => {
-            document.getElementById('authModal').classList.toggle('hidden');
-        };
+    // --- GLOBAL VARIABLES ---
+    window.selectedCategory = "";
+    window.selectedGender = "";
+    window.selectedFile = null; 
+    window.isLoginMode = true; 
 
-        window.switchAuthMode = () => {
-            window.isLoginMode = !window.isLoginMode;
-            const title = document.getElementById('auth-title');
-            const subtitle = document.getElementById('auth-subtitle');
-            const btn = document.getElementById('authSubmitBtn');
-            const toggleText = document.getElementById('auth-toggle-text');
-            const switchBtn = document.getElementById('auth-switch-btn');
+    // --- 1. AUTH FUNCTIONS ---
+    window.toggleAuthModal = () => {
+        document.getElementById('authModal').classList.toggle('hidden');
+    };
 
+    window.switchAuthMode = () => {
+        window.isLoginMode = !window.isLoginMode;
+        const title = document.getElementById('auth-title');
+        const subtitle = document.getElementById('auth-subtitle');
+        const btn = document.getElementById('authSubmitBtn');
+        const toggleText = document.getElementById('auth-toggle-text');
+        const switchBtn = document.getElementById('auth-switch-btn');
+
+        if (window.isLoginMode) {
+            title.innerText = "Welcome Back";
+            subtitle.innerText = "Login to your account to continue";
+            btn.innerText = "Login";
+            toggleText.innerText = "Don't have an account?";
+            switchBtn.innerText = "Sign Up";
+        } else {
+            title.innerText = "Create Account";
+            subtitle.innerText = "Join us to start generating AI photos";
+            btn.innerText = "Sign Up";
+            toggleText.innerText = "Already have an account?";
+            switchBtn.innerText = "Login";
+        }
+    };
+
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('authEmail').value;
+        const password = document.getElementById('authPassword').value;
+        try {
             if (window.isLoginMode) {
-                title.innerText = "Welcome Back";
-                subtitle.innerText = "Login to your account to continue";
-                btn.innerText = "Login";
-                toggleText.innerText = "Don't have an account?";
-                switchBtn.innerText = "Sign Up";
+                await signInWithEmailAndPassword(auth, email, password);
             } else {
-                title.innerText = "Create Account";
-                subtitle.innerText = "Join us to start generating AI photos";
-                btn.innerText = "Sign Up";
-                toggleText.innerText = "Already have an account?";
-                switchBtn.innerText = "Login";
+                await createUserWithEmailAndPassword(auth, email, password);
             }
-        };
-
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('authEmail').value;
-            const password = document.getElementById('authPassword').value;
-            try {
-                if (window.isLoginMode) {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    await createUserWithEmailAndPassword(auth, email, password);
-                }
-                toggleAuthModal();
-            } catch (error) {
-                alert("Auth Error: " + error.message);
-            }
-        });
-
-        window.handleLogout = async () => {
-            await signOut(auth);
-            location.reload();
-        };
-
-        // --- 2. UI NAVIGATION FUNCTIONS ---
-        window.selectCategory = (cat) => {
-            window.selectedCategory = cat;
-            window.selectedGender = "";
-            document.getElementById('btn-man').classList.remove('active');
-            document.getElementById('btn-woman').classList.remove('active');
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('categories-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-            document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
-            document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
-        };
-
-        window.selectGender = (gender) => {
-            window.selectedGender = gender;
-            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
-            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
-        };
-
-        window.showUploadSection = () => {
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('categories-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-        };
-
-        window.hideUploadSection = () => {
-            document.getElementById('upload-section').classList.add('hidden');
-            document.getElementById('categories-section').classList.remove('hidden');
-        };
-
-        // --- 3. AUTH STATE LISTENER ---
-        onAuthStateChanged(auth, async (user) => {
-            const authButtons = document.getElementById('auth-buttons');
-            const userProfile = document.getElementById('user-profile');
-            const userEmailSpan = document.getElementById('user-email');
-            const categoriesSection = document.getElementById('categories-section');
-            const uploadSection = document.getElementById('upload-section');
-            const dashboardSection = document.getElementById('dashboard-section');
-
-            if (user) {
-                console.log("✅ [AUTH] User logged in:", user.email);
-                authButtons.classList.add('hidden');
-                userProfile.classList.remove('hidden');
-                userEmailSpan.innerText = user.email;
-                
-                dashboardSection.classList.remove('hidden');
-                categoriesSection.classList.add('hidden');
-                uploadSection.classList.add('hidden');
-
-                fetchUserPhotos(user.uid);
-                fetchUserCredits(user.uid);
-            } else {
-                console.log("👤 [AUTH] No user logged in.");
-                authButtons.classList.remove('hidden');
-                userProfile.classList.add('hidden');
-                dashboardSection.classList.add('hidden');
-                uploadSection.classList.add('hidden');
-                categoriesSection.classList.remove('hidden');
-            }
-        });
-
-        async function fetchUserPhotos(userId) {
-            const grid = document.getElementById('photo-grid');
-            const noPhotosMsg = document.getElementById('no-photos-msg');
-            try {
-                const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
-                const photos = await response.json();
-
-                if (photos && photos.length > 0) {
-                    noPhotosMsg.classList.add('hidden');
-                    grid.innerHTML = ""; 
-                    photos.forEach(photo => {
-                        const card = document.createElement('div');
-                        card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                        card.innerHTML = `
-                            <div class="relative overflow-hidden">
-                                <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover" alt="AI Photo">
-                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3">
-                                    <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">
-                                        View Full
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="p-4">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
-                                    <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                        `;
-                        grid.appendChild(card);
-                    });
-                } else {
-                    noPhotosMsg.classList.remove('hidden');
-                    grid.innerHTML = "";
-                }
-            } catch (error) {
-                console.error(error);
-            }
+            toggleAuthModal();
+        } catch (error) {
+            alert("Auth Error: " + error.message);
         }
+    });
 
-        async function fetchUserCredits(userId) {
-            try {
-                const res = await fetch(`${BASE_URL}/user-profile/${userId}`);
-                const data = await res.json();
-                if (data.success) {
-                    document.getElementById('credit-count').innerText = `Credits: ${data.credits}`;
-                }
-            } catch (err) {
-                console.error("Error fetching credits:", err);
-            }
+    window.handleLogout = async () => {
+        await signOut(auth);
+        location.reload();
+    };
+
+    // --- 2. UI NAVIGATION FUNCTIONS ---
+    window.selectCategory = (cat) => {
+        window.selectedCategory = cat;
+        window.selectedGender = "";
+        document.getElementById('btn-man').classList.remove('active');
+        document.getElementById('btn-woman').classList.remove('active');
+        document.getElementById('upload-section').classList.remove('hidden');
+        document.getElementById('categories-section').classList.add('hidden');
+        document.getElementById('dashboard-section').classList.add('hidden');
+        document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
+        document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
+    };
+
+    window.selectGender = (gender) => {
+        window.selectedGender = gender;
+        document.getElementById('btn-man').classList.toggle('active', gender === 'man');
+        document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+    };
+
+    window.showUploadSection = () => {
+        document.getElementById('upload-section').classList.remove('hidden');
+        document.getElementById('categories-section').classList.add('hidden');
+        document.getElementById('dashboard-section').classList.add('hidden');
+    };
+
+    window.hideUploadSection = () => {
+        document.getElementById('upload-section').classList.add('hidden');
+        document.getElementById('categories-section').classList.remove('hidden');
+    };
+
+    // --- 3. AUTH STATE LISTENER ---
+    onAuthStateChanged(auth, async (user) => {
+        const authButtons = document.getElementById('auth-buttons');
+        const userProfile = document.getElementById('user-profile');
+        const userEmailSpan = document.getElementById('user-email');
+        const categoriesSection = document.getElementById('categories-section');
+        const uploadSection = document.getElementById('upload-section');
+        const dashboardSection = document.getElementById('dashboard-section');
+
+        if (user) {
+            console.log("✅ [AUTH] User logged in:", user.email);
+            authButtons.classList.add('hidden');
+            userProfile.classList.remove('hidden');
+            userEmailSpan.innerText = user.email;
+            dashboardSection.classList.remove('hidden');
+            categoriesSection.classList.add('hidden');
+            uploadSection.classList.add('hidden');
+            fetchUserPhotos(user.uid);
+        } else {
+            authButtons.classList.remove('hidden');
+            userProfile.classList.add('hidden');
+            dashboardSection.classList.add('hidden');
+            uploadSection.classList.add('hidden');
+            categoriesSection.classList.remove('hidden');
         }
+    });
 
-        // 4. IMAGE & PAYMENT LOGIC
-        document.getElementById('imageInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                window.selectedFile = file;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    document.getElementById('imagePreview').src = event.target.result;
-                    document.getElementById('preview-container').classList.remove('hidden');
-                    document.getElementById('submitBtn').classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+    async function fetchUserPhotos(userId) {
+        const grid = document.getElementById('photo-grid');
+        const noPhotosMsg = document.getElementById('no-photos-msg');
+        try {
+            // 🚀 FIXED: Using BASE_URL instead of localhost
+            const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
+            const photos = await response.json();
 
-        document.getElementById('submitBtn').addEventListener('click', async function() {
-            if (!window.selectedGender) return alert("Please select Gender!");
-            if (!window.selectedFile) return alert("Please select an image!");
-            
-            const user = auth.currentUser;
-            if (!user) return alert("Please Login first!");
-
-            const formData = new FormData();
-            formData.append('image', window.selectedFile);
-            formData.append('category', window.selectedCategory);
-            formData.append('gender', window.selectedGender);
-            formData.append('userId', user.uid); // FIXED: Added User ID here
-
-            document.getElementById('loadingModal').classList.remove('hidden');
-
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, {
-                    method: 'POST',
-                    body: formData
+            if (photos && photos.length > 0) {
+                noPhotosMsg.classList.add('hidden');
+                grid.innerHTML = ""; 
+                photos.forEach(photo => {
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
+                    card.innerHTML = `
+                        <div class="relative overflow-hidden">
+                            <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover" alt="AI Photo">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3">
+                                <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">
+                                    View Full
+                                </a>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
+                                <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
                 });
-
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                } else {
-                    throw new Error(result.error || "AI Generation failed");
-                }
-            } catch (error) {
-                console.error("Upload error:", error);
-                alert("Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
+            } else {
+                noPhotosMsg.classList.remove('hidden');
+                grid.innerHTML = "";
             }
-        });
-    </script>
+        } catch (error) {
+            console.error("Error fetching photos:", error);
+        }
+    }
+
+    // --- 4. IMAGE & PAYMENT LOGIC ---
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            window.selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                document.getElementById('imagePreview').src = event.target.result;
+                document.getElementById('preview-container').classList.remove('hidden');
+                document.getElementById('submitBtn').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', async function() {
+        if (!window.selectedGender) return alert("Please select Gender!");
+        if (!window.selectedFile) return alert("Please select an image!");
+        
+        const user = auth.currentUser;
+        if (!user) return alert("Please Login first!");
+
+        const formData = new FormData();
+        formData.append('image', window.selectedFile);
+        formData.append('category', window.selectedCategory);
+        formData.append('gender', window.selectedGender);
+        formData.append('userId', user.uid); // ✅ FIXED: userId is now added correctly
+
+        document.getElementById('loadingModal').classList.remove('hidden');
+
+        try {
+            // 🚀 FIXED: Using BASE_URL instead of localhost
+            const response = await fetch(`${BASE_URL}/upload`, {
+                method: 'POST',
+                body: formData 
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                document.getElementById('resultImage').src = result.ai_image_url;
+                document.getElementById('downloadBtn').href = result.ai_image_url;
+                document.getElementById('successModal').classList.remove('hidden');
+                document.getElementById('loadingModal').classList.add('hidden');
+            } else {
+                throw new Error(result.error || "AI Generation failed");
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Error: " + error.message);
+            document.getElementById('loadingModal').classList.add('hidden');
+        }
+    });
+</script>
 </body>
 </html>
