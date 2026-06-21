@@ -16,7 +16,14 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const app = express();
 
 // 2. Middleware - SABSE UPAR CORS RAKHNA HAI
-app.use(cors()); 
+const express = require('express');
+const cors = require('cors');
+const app = express();
+app.use(cors({
+origin: '*', // Iska matlab hai: Duniya ki koi bhi website mujhse baat kar sakti hai
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
