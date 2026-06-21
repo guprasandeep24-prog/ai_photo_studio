@@ -15,20 +15,11 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-const express = require('express');
-const cors = require('cors');
-const app = express();
-
-// 1. CORS ko SABSE PEHLE rakhiye aur isse bilkul khula chhod dijiye
-app.use(cors({
-    origin: '*', // Iska matlab hai: Duniya ki koi bhi website mujhse baat kar sakti hai
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// 2. Phir baaki middleware
+// 2. Middleware - SABSE UPAR CORS RAKHNA HAI
+app.use(cors()); 
 app.use(express.json());
-// ... baki saara code ...
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/templates', express.static(path.join(__dirname, 'templates')));
 
 // 3. Initialization
 mongoose.connect(process.env.MONGODB_URI)
