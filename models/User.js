@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
-const UserSchema = new mongoose.Schema({
-    firebaseUid: { type: String, required: true, unique: true }, // Firebase se aayega
-    email: { type: String },
-    credits: { type: Number, default: 0 }, // USER KA WALLET YAHAN HOGA
+const userSchema = new mongoose.Schema({
+    email: { type: String, required: true, unique: true },
+    firebaseUid: { type: String, required: true, unique: true }, // <--- Yeh hona zaroori hai
+    credits: { type: Number, default: 10 },
     createdAt: { type: Date, default: Date.now }
 });
 
