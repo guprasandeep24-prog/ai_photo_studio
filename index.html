@@ -85,7 +85,9 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
+        
+        // ✅ FIXED: Removed "-studio" from URL
+        const BASE_URL = "https://ai-photo-e3so.onrender.com";
 
         window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.isLoginMode = true;
 
@@ -201,13 +203,18 @@
         });
 
         document.getElementById('submitBtn').addEventListener('click', async function() {
-            if (!window.selectedGender || !window.selectedFile || !auth.currentUser) return alert("Please select gender, image and login first!");
+            // ✅ IMPROVED CHECK: Ensure user is logged in and we have their UID
+            const currentUser = auth.currentUser;
+            if (!window.selectedGender || !window.selectedFile || !currentUser) {
+                return alert("Please select gender, image and login first!");
+            }
+
             document.getElementById('loadingModal').classList.remove('hidden');
             const formData = new FormData();
             formData.append('image', window.selectedFile);
             formData.append('category', window.selectedCategory);
             formData.append('gender', window.selectedGender);
-            formData.append('userId', auth.currentUser.uid);
+            formData.append('userId', currentUser.uid); // <--- This is now safe
 
             try {
                 const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
