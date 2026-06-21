@@ -15,12 +15,19 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// 2. Middleware - SABSE UPAR CORS RAKHNA HAI
-app.use(cors()); 
+// 2. Middleware - CORS FIX (Sabse important part)
+app.use(cors({
+    origin: "https://guprasandeep24-prog.github.io", // Aapka GitHub URL
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
+}));
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Static files setup
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
-
 
 // 3. Initialization
 mongoose.connect(process.env.MONGODB_URI)
@@ -35,7 +42,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// 4. Multer Setup
+// 4. Multer Setup (File Upload ke liye)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -56,7 +63,10 @@ const TEMPLATES = {
 // 6. AI Logic
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-    const output = await replicate.run("pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } });
+    const output = await replicate.run("pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", { 
+        input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } 
+    });
+
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
@@ -72,6 +82,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 }
 
 // 7. ROUTES
+// UPLOAD ROUTE
 app.post('/upload', upload.single('image'), async (req, res) => {
     let localFilePath = req.file ? req.file.path : null;
     try {
@@ -79,42 +90,68 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         if (!localFilePath || !category || !gender || !userId) {
             return res.status(400).json({ success: false, error: "Missing info or User ID!" });
         }
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
 
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found in Database!" });
+        if (user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
+
+        // Upload to Cloudinary
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
+        
+        // Run AI
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
+        // Update User Credits
         user.credits -= 1;
         await user.save();
 
-        await Order.create({ userId, category, gender, aiImageUrl: finalAiImageUrl, status: 'completed', razorpayOrderId: 'N/A' });
+        // Save Order
+        await Order.create({ 
+            userId, 
+            category, 
+            gender, 
+            aiImageUrl: finalAiImageUrl, 
+            status: 'completed', 
+            razorpayOrderId: 'N/A' 
+        });
+
+        // Delete local file
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+
         res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
     } catch (error) {
+        console.error("Upload Error:", error);
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
+// PAYMENTS ROUTE
 app.use('/api/payments', paymentRoutes);
 
+// USER PROFILE ROUTE
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         const user = await User.findOne({ firebaseUid: req.params.userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         res.json({ success: true, credits: user.credits, email: user.email });
-    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+    } catch (error) { 
+        res.status(500).json({ success: false, error: error.message }); 
+    }
 });
 
+// MY PHOTOS ROUTE
 app.get('/my-photos', async (req, res) => {
     try {
         const { userId } = req.query;
         const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
-    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+    } catch (error) { 
+        res.status(500).json({ success: false, error: error.message }); 
+    }
 });
 
+// Error Handling Middleware
 app.use((err, req, res, next) => {
     console.error("💥 [CRITICAL ERROR]:", err.stack);
     res.status(500).json({ success: false, error: "Internal Server Error" });
@@ -123,7 +160,7 @@ app.use((err, req, res, next) => {
 // 10. Start Server
 const PORT = process.env.PORT || 5000;
 
-// DHAYAN DEIN: '0.0.0.0' likhna bahut zaroori hai Render ke liye!
+// Render requires '0.0.0.0' to work correctly
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
     console.log(`🚀 PUBLIC URL: https://ai-photo-e3so.onrender.com`);
