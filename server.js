@@ -83,45 +83,35 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // 7. ROUTES
 // UPLOAD ROUTE
-app.post('/upload', upload.single('image'), async (req, res) => {
-    let localFilePath = req.file ? req.file.path : null;
+// --- NAYA REGISTER ROUTE ---
+app.post('/register', async (req, res) => {
     try {
-        const { category, gender, userId } = req.body;
-        if (!localFilePath || !category || !gender || !userId) {
-            return res.status(400).json({ success: false, error: "Missing info or User ID!" });
+        const { email, firebaseUid } = req.body;
+        if (!email || !firebaseUid) {
+            return res.status(400).json({ success: false, error: "Missing Email or UID!" });
         }
 
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user) return res.status(404).json({ success: false, error: "User not found in Database!" });
-        if (user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
-
-        // Upload to Cloudinary
-        const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
+        // Check karo kya user pehle se hai?
+        let user = await User.findOne({ firebaseUid: firebaseUid });
         
-        // Run AI
-        const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
+        if (user) {
+            return res.status(200).json({ success: true, message: "User already exists" });
+        }
 
-        // Update User Credits
-        user.credits -= 1;
-        await user.save();
-
-        // Save Order
-        await Order.create({ 
-            userId, 
-            category, 
-            gender, 
-            aiImageUrl: finalAiImageUrl, 
-            status: 'completed', 
-            razorpayOrderId: 'N/A' 
+        // Agar naya user hai, toh use MongoDB mein save karo
+        // Hum naye user ko 10 FREE CREDITS de rahe hain taaki wo test kar sake!
+        user = new User({ 
+            email: email, 
+            firebaseUid: firebaseUid, 
+            credits: 10 
         });
+        
+        await user.save();
+        console.log(`🌟 NEW USER REGISTERED: ${email} with 10 credits!`);
+        res.status(201).json({ success: true, message: "User registered successfully" });
 
-        // Delete local file
-        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-
-        res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
     } catch (error) {
-        console.error("Upload Error:", error);
-        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+        console.error("❌ Registration Error:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -163,5 +153,5 @@ const PORT = process.env.PORT || 5000;
 // Render requires '0.0.0.0' to work correctly
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${PORT}`);
-    console.log(`🚀 PUBLIC URL: https://ai-photo-e3so.onrender.com`);
+    console.log(`🚀 PUBLIC URL: https://ai-photo-studio-e3so.onrender.com`);
 });

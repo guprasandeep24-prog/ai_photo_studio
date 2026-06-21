@@ -101,92 +101,45 @@
             document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
         };
 
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('authEmail').value;
-            const password = document.getElementById('authPassword').value;
-            try {
-                if (window.isLoginMode) await signInWithEmailAndPassword(auth, email, password);
-                else await createUserWithEmailAndPassword(auth, email, password);
-                toggleAuthModal();
-            } catch (error) { alert("Auth Error: " + error.message); }
-        });
+        // --- index.html ka update kiya hua authForm logic ---
+document.getElementById('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('authEmail').value;
+    const password = document.getElementById('authPassword').value;
 
-        window.handleLogout = async () => { await signOut(auth); location.reload(); };
+    try {
+        if (window.isLoginMode) {
+            // LOGIN MODE
+            await signInWithEmailAndPassword(auth, email, password);
+        } else {
+            // SIGN UP MODE
+            const signUpResult = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser = signUpResult.user;
 
-        window.selectCategory = (cat) => {
-            window.selectedCategory = cat; window.selectedGender = "";
-            document.getElementById('btn-man').classList.remove('active');
-            document.getElementById('btn-woman').classList.remove('active');
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('categories-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-            document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
-        };
+            // 🚀 SABSE IMPORTANT: Firebase ke turant baad Backend ko batana hai
+            console.log("Registering user in MongoDB...");
+            const regRes = await fetch(`${BASE_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    email: newUser.email, 
+                    firebaseUid: newUser.uid 
+                })
+            });
 
-        window.selectGender = (gender) => {
-            window.selectedGender = gender;
-            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
-            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
-        };
-
-        window.showUploadSection = () => {
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('categories-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-        };
-
-        window.hideUploadSection = () => {
-            document.getElementById('upload-section').classList.add('hidden');
-            document.getElementById('categories-section').classList.remove('hidden');
-        };
-
-        onAuthStateChanged(auth, async (user) => {
-            const authButtons = document.getElementById('auth-buttons');
-            const userProfile = document.getElementById('user-profile');
-            const userEmailSpan = document.getElementById('user-email');
-            const categoriesSection = document.getElementById('categories-section');
-            const uploadSection = document.getElementById('upload-section');
-            const dashboardSection = document.getElementById('dashboard-section');
-
-            if (user) {
-                authButtons.classList.add('hidden');
-                userProfile.classList.remove('hidden');
-                userEmailSpan.innerText = user.email;
-                dashboardSection.classList.remove('hidden');
-                categoriesSection.classList.add('hidden');
-                uploadSection.classList.add('hidden');
-                fetchUserPhotos(user.uid);
-            } else {
-                authButtons.classList.remove('hidden');
-                userProfile.classList.add('hidden');
-                dashboardSection.classList.add('hidden');
-                uploadSection.classList.add('hidden');
-                categoriesSection.classList.remove('hidden');
+            const regData = await regRes.json();
+            if (!regData.success) {
+                throw new Error("Firebase account created, but registration in database failed!");
             }
-        });
-
-        async function fetchUserPhotos(userId) {
-            const grid = document.getElementById('photo-grid');
-            const noPhotosMsg = document.getElementById('no-photos-msg');
-            try {
-                const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
-                const photos = await response.json();
-                if (photos && photos.length > 0) {
-                    noPhotosMsg.classList.add('hidden');
-                    grid.innerHTML = "";
-                    photos.forEach(photo => {
-                        const card = document.createElement('div');
-                        card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span><span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
-                        grid.appendChild(card);
-                    });
-                } else {
-                    noPhotosMsg.classList.remove('hidden');
-                    grid.innerHTML = "";
-                }
-            } catch (error) { console.error(error); }
+            console.log("✅ User successfully synced with MongoDB!");
         }
+        
+        toggleAuthModal(); // Modal band karo
+    } catch (error) { 
+        console.error(error);
+        alert("Auth Error: " + error.message); 
+    }
+});
 
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
