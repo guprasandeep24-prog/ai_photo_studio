@@ -120,42 +120,51 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 app.use('/api/payments', paymentRoutes);
 
 // 🚀 IMPROVED ROUTE 3: Profile (With Auto-Registration)
+// 🚀 ROUTE 3: Profile (With Auto-Registration)
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
         let user = await User.findOne({ firebaseUid: userId });
 
-        // ✨ SMART FEATURE: Agar user MongoDB mein nahi hai, toh use automatic create kar do!
         if (!user) {
-            console.log(`🆕 [NEW USER] Creating new user in database for UID: ${userId}`);
+            console.log(`🆕 [NEW USER] Auto-creating user for UID: ${userId}`);
             user = new User({
                 firebaseUid: userId,
-                email: "new-user@example.com", // Default, later updated by frontend if needed
-                credits: 5 // Give 5 free credits to new users!
+                email: "new-user@example.com", // Default
+                credits: 5 // Welcome credits!
             });
             await user.save();
-            console.log("✅ [NEW USER] Created successfully!");
         }
 
-        res.json({ 
-            success: true, 
-            credits: user.credits, 
-            email: user.email,
-            firebaseUid: user.firebaseUid 
-        });
+        res.json({ success: true, credits: user.credits, email: user.email });
     } catch (error) {
         console.error("❌ [PROFILE ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
+// 🚀 ROUTE 4: Gallery (With Auto-Registration to prevent 404)
 app.get('/my-photos', async (req, res) => {
     try {
         const { userId } = req.query;
-        if(!userId) return res.status(400).json({success: false, error: "userId required"});
+        if (!userId) return res.status(400).json({ success: false, error: "userId required" });
+
+        // Check if user exists, if not, create them silently
+        let user = await User.findOne({ firebaseUid: userId });
+        if (!user) {
+            console.log(`🆕 [NEW USER] Auto-creating user during gallery fetch: ${userId}`);
+            user = new User({
+                firebaseUid: userId,
+                email: "new-user@example.com",
+                credits: 5
+            });
+            await user.save();
+        }
+
         const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
     } catch (error) {
+        console.error("❌ [GALLERY ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
