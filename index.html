@@ -227,34 +227,72 @@ window.showUploadSection = () => {
             }
         });
 
-        document.getElementById('submitBtn').addEventListener('click', async function() {
-            const currentUser = auth.currentUser;
-            if (!window.selectedCategory) return alert("⚠️ Please select a Category first!"); // <--- YE ADD KAREIN
-    if (!window.selectedGender) return alert("⚠️ Please select Gender!");
-    if (!window.selectedFile) return alert("⚠️ Please select an image!"); 
-            
+        // --- 4. IMAGE & PAYMENT LOGIC (UPGRADED) ---
+document.getElementById('submitBtn').addEventListener('click', async function() {
+    const user = auth.currentUser;
 
-            document.getElementById('loadingModal').classList.remove('hidden');
-            const formData = new FormData();
-formData.append('userId', user.uid);             // 1. Pehle User ID
-formData.append('category', window.selectedCategory); // 2. Phir Category
-formData.append('gender', window.selectedGender);     // 3. Phir Gender
-formData.append('image', window.selectedFile);        // 4. Sabse LAST mein File
+    // 🔍 STEP 1: Check Login
+    if (!user) {
+        alert("⚠️ Please Login first to use the AI Studio!");
+        toggleAuthModal(); // Login modal khol do
+        return;
+    }
 
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                } else { throw new Error(result.error || "AI Generation failed"); }
-            } catch (error) {
-                alert("Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
-            }
+    // 🔍 STEP 2: Check Category (Sabse zaroori)
+    if (!window.selectedCategory) {
+        alert("⚠️ Please select a Category (LinkedIn, Wedding, or Fashion) first!");
+        // User ko wapas category section par bhejein
+        document.getElementById('upload-section').classList.add('hidden');
+        document.getElementById('categories-section').classList.remove('hidden');
+        return;
+    }
+
+    // 🔍 STEP 3: Check Gender
+    if (!window.selectedGender) {
+        alert("⚠️ Please select Gender (Man or Woman)!");
+        return;
+    }
+
+    // 🔍 STEP 4: Check Image File
+    if (!window.selectedFile) {
+        alert("⚠️ Please choose an image first!");
+        return;
+    }
+
+    // --- AGAR SAB SAHI HAI, TOH PROCEED KAREIN ---
+    const formData = new FormData();
+    formData.append('image', window.selectedFile);
+    formData.append('category', window.selectedCategory);
+    formData.append('gender', window.selectedGender);
+    formData.append('userId', user.uid);
+
+    // Loading modal dikhayein
+    document.getElementById('loadingModal').classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${BASE_URL}/upload`, {
+            method: 'POST',
+            body: formData 
         });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Success! Show results
+            document.getElementById('resultImage').src = result.ai_image_url;
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+        } else {
+            // Backend error (e.g., Insufficient Credits)
+            throw new Error(result.error || "AI Generation failed");
+        }
+    } catch (error) {
+        console.error("Upload error:", error);
+        alert("❌ Error: " + error.message);
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+});
 
         // Event Listeners for Buttons
         document.getElementById('loginBtn').addEventListener('click', () => toggleAuthModal());
