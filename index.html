@@ -86,10 +86,12 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        // ✅ CORRECT URL (With -studio)
+        // ✅ YAHAN CHECK KAREIN: Kya ye wahi hai jo Render par hai?
         const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
-        // Window scope mein functions define karna zaroori hai taaki HTML onclick unhe dhund sake
+        // 🕵️ DEBUGGING: Website kholne ke baad Console mein check karein ki URL sahi hai ya nahi
+        console.log("🚀 CURRENT BASE_URL IS:", BASE_URL);
+
         window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.isLoginMode = true;
 
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
@@ -101,6 +103,36 @@
             document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
             document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
         };
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            try {
+                if (window.isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    const signUpResult = await createUserWithEmailAndPassword(auth, email, password);
+                    const newUser = signUpResult.user;
+
+                    console.log("Registering user in MongoDB...");
+                    const regRes = await fetch(`${BASE_URL}/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: newUser.email, firebaseUid: newUser.uid })
+                    });
+                    const regData = await regRes.json();
+                    if (!regData.success) throw new Error("Registration failed!");
+                }
+                toggleAuthModal();
+            } catch (error) { 
+                console.error(error);
+                alert("Auth Error: " + error.message); 
+            }
+        });
+
+        window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
         window.selectCategory = (cat) => {
             window.selectedCategory = cat; window.selectedGender = "";
@@ -127,44 +159,6 @@
         window.hideUploadSection = () => {
             document.getElementById('upload-section').classList.add('hidden');
             document.getElementById('categories-section').classList.remove('hidden');
-        };
-
-        // Auth Events
-        document.getElementById('loginBtn').addEventListener('click', () => toggleAuthModal());
-        document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
-        document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
-        document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
-
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('authEmail').value;
-            const password = document.getElementById('authPassword').value;
-
-            try {
-                if (window.isLoginMode) {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    const signUpResult = await createUserWithEmailAndPassword(auth, email, password);
-                    const newUser = signUpResult.user;
-
-                    // 🚀 Register in MongoDB
-                    const regRes = await fetch(`${BASE_URL}/register`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: newUser.email, firebaseUid: newUser.uid })
-                    });
-                    const regData = await regRes.json();
-                    if (!regData.success) throw new Error("Registration failed!");
-                }
-                toggleAuthModal();
-            } catch (error) { 
-                alert("Auth Error: " + error.message); 
-            }
-        });
-
-        window.handleLogout = async () => { 
-            await signOut(auth); 
-            location.reload(); 
         };
 
         onAuthStateChanged(auth, async (user) => {
@@ -255,6 +249,13 @@
                 document.getElementById('loadingModal').classList.add('hidden');
             }
         });
+
+        // Event Listeners for Buttons
+        document.getElementById('loginBtn').addEventListener('click', () => toggleAuthModal());
+        document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
+        document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
+        document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
+
     </script>
 </body>
 </html>
