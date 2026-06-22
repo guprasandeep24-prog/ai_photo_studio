@@ -63,16 +63,50 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
+// 🚀 IMPROVED & SIMPLIFIED AI LOGIC
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-    const output = await replicate.run("pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } });
     
-    if (output) {
-        // Replicate output handling
-        const finalUrl = Array.isArray(output) ? output[0] : output;
+    console.log("🤖 [AI] Starting Replicate Face-Swap...");
+    console.log("🖼️ [AI] Target Image:", targetImageUrl);
+    console.log("👤 [AI] Swapping with:", userCloudinaryUrl);
+
+    try {
+        // Replicate call
+        const output = await replicate.run(
+            "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
+            { 
+                input: { 
+                    target_image: targetImageUrl, 
+                    swap_image: userCloudinaryUrl 
+                } 
+            }
+        );
+
+        console.log("✅ [AI] Replicate Output Received:", output);
+
+        // Replicate direct URL bhej sakta hai ya array mein
+        let finalUrl = "";
+        if (typeof output === 'string') {
+            finalUrl = output;
+        } else if (Array.isArray(output) && output.length > 0) {
+            finalUrl = output[0];
+        } else {
+            throw new Error("Unexpected output format from AI");
+        }
+
+        // Check if URL is valid
+        if (!finalUrl || !finalUrl.startsWith('http')) {
+            throw new Error("AI returned an invalid image URL");
+        }
+
+        console.log("🚀 [AI] Success! Final Image URL:", finalUrl);
         return finalUrl;
+
+    } catch (error) {
+        console.error("❌ [AI ERROR]:", error.message);
+        throw error; // Error ko aage bhejein taaki /upload catch kar sake
     }
-    throw new Error("AI Generation failed to return image");
 }
 
 // --- 4. ROUTES ---
