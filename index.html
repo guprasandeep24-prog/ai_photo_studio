@@ -230,10 +230,10 @@
 
             document.getElementById('loadingModal').classList.remove('hidden');
             const formData = new FormData();
-            formData.append('image', window.selectedFile);
-            formData.append('category', window.selectedCategory);
-            formData.append('gender', window.selectedGender);
-            formData.append('userId', currentUser.uid);
+formData.append('userId', user.uid);             // 1. Pehle User ID
+formData.append('category', window.selectedCategory); // 2. Phir Category
+formData.append('gender', window.selectedGender);     // 3. Phir Gender
+formData.append('image', window.selectedFile);        // 4. Sabse LAST mein File
 
             try {
                 const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
