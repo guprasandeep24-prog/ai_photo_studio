@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// 1. Yahan humne "UserSchema" naam ka box banaya jo pehle missing tha
+// 1. UserSchema ko sahi se define karna zaroori hai
 const UserSchema = new mongoose.Schema({
     email: { 
         type: String, 
@@ -14,11 +14,12 @@ const UserSchema = new mongoose.Schema({
     },
     credits: { 
         type: Number, 
-        default: 10  // Naye users ko 10 free credits milenge
+        default: 10 
     }
 }, { 
-    timestamps: true // Isse humein pata chalega user kab bana
+    timestamps: true 
 });
 
-// 2. Ab hum is Schema ko export kar rahe hain taaki server ise use kar sake
-module.exports = mongoose.model('User', UserSchema);
+// 2. Model ko export karna
+const User = mongoose.model('User', UserSchema);
+module.exports = User;
