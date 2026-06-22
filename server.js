@@ -119,12 +119,32 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
 app.use('/api/payments', paymentRoutes);
 
+// 🚀 IMPROVED ROUTE 3: Profile (With Auto-Registration)
 app.get('/user-profile/:userId', async (req, res) => {
     try {
-        const user = await User.findOne({ firebaseUid: req.params.userId });
-        if (!user) return res.status(404).json({ success: false, error: "User not found" });
-        res.json({ success: true, credits: user.credits, email: user.email });
+        const userId = req.params.userId;
+        let user = await User.findOne({ firebaseUid: userId });
+
+        // ✨ SMART FEATURE: Agar user MongoDB mein nahi hai, toh use automatic create kar do!
+        if (!user) {
+            console.log(`🆕 [NEW USER] Creating new user in database for UID: ${userId}`);
+            user = new User({
+                firebaseUid: userId,
+                email: "new-user@example.com", // Default, later updated by frontend if needed
+                credits: 5 // Give 5 free credits to new users!
+            });
+            await user.save();
+            console.log("✅ [NEW USER] Created successfully!");
+        }
+
+        res.json({ 
+            success: true, 
+            credits: user.credits, 
+            email: user.email,
+            firebaseUid: user.firebaseUid 
+        });
     } catch (error) {
+        console.error("❌ [PROFILE ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
