@@ -8,9 +8,9 @@ const orderSchema = new mongoose.Schema({
     gender: { type: String, required: true },
     aiImageUrl: { type: String, required: true },
     status: { type: String, default: 'completed' },
-    // ❌ PURANA: razorpayOrderId: { type: String, unique: true }
-    // ✅ NAYA: Unique hata diya taaki multiple "N/A" allow ho sakein
+
     razorpayOrderId: { type: String, default: 'N/A' } 
+
 }, { timestamps: true });
 
 
