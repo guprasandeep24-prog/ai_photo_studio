@@ -63,13 +63,13 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🚀 ULTIMATE STREAM-PROOF AI LOGIC
+// 🚀 THE "BRUTE FORCE" STREAM-PROOF AI LOGIC
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
-    console.log("🖼️ [AI] Target Image:", targetImageUrl);
-    console.log("👤 [AI] Swapping with:", userCloudinaryUrl);
+    console.log("🖼️ [AI] Target:", targetImageUrl);
+    console.log("👤 [AI] Swap with:", userCloudinaryUrl);
 
     try {
         const output = await replicate.run(
@@ -82,56 +82,71 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         );
 
-        console.log("📦 [AI] RAW OUTPUT RECEIVED (Type check):", typeof output);
+        console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
+        console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output).substring(0, 200)); // Log first 200 chars
 
-        // --- 🛠️ THE SMART STREAM HANDLER ---
-        
-        // Case 1: Agar output ek Stream hai (Jaisa aapke logs mein dikha)
-        if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            console.log("🌊 [AI] Detected a Stream! Collecting chunks into a bucket...");
-            const chunks = [];
-            for await (const chunk of output) {
-                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-            }
-            const buffer = Buffer.concat(chunks);
-
-            // Check if the buffer is actually just a string (URL)
-            const potentialUrl = buffer.toString().trim();
-            if (potentialUrl.startsWith('http')) {
-                console.log("🔗 [AI] Stream was actually a URL string. Using it.");
-                return potentialUrl;
-            }
-
-            // Otherwise, it's the actual image data. Upload to Cloudinary.
-            console.log("📤 [AI] Stream was image data. Uploading buffer to Cloudinary...");
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream(
-                    { folder: "ai_studio_final" }, 
-                    (error, result) => {
-                        if (error) reject(error); else resolve(result);
-                    }
-                ).end(buffer);
-            });
-            return uploadResult.secure_url;
-        }
-
-        // Case 2: Agar output seedha String hai
-        if (typeof output === 'string') {
+        // --- STRATEGY 1: Direct String (The easiest) ---
+        if (typeof output === 'string' && output.startsWith('http')) {
+            console.log("✅ [AI] Strategy 1 Success: Found direct URL string.");
             return output;
         }
 
-        // Case 3: Agar output Array hai
+        // --- STRATEGY 2: Array (Common) ---
         if (Array.isArray(output) && output.length > 0) {
-            return output[0];
+            if (typeof output[0] === 'string' && output[0].startsWith('http')) {
+                console.log("✅ [AI] Strategy 2 Success: Found URL in array.");
+                return output[0];
+            }
         }
 
-        // Case 4: Agar output Object hai
-        if (typeof output === 'object' && output !== null) {
-            const url = output.output || output.url || output.image;
-            if (url) return url;
+        // --- STRATEGY 3: Object with keys (Common) ---
+        if (output && typeof output === 'object' && !Array.isArray(output)) {
+            const urlFromObj = output.output || output.url || output.image || (output.data ? output.data[0] : null);
+            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) {
+                console.log("✅ [AI] Strategy 3 Success: Found URL inside object.");
+                return urlFromObj;
+            }
         }
 
-        throw new Error("AI returned an unrecognizable format.");
+        // --- STRATEGY 4: The "Heavy Lifting" (Handling the Stream/ReadableStream) ---
+        // We try to consume it as an async iterator (works for most streams)
+        try {
+            console.log("🌊 [AI] Strategy 4: Attempting to consume output as a Stream...");
+            const chunks = [];
+            
+            // This works if it's a Web Stream or Node Stream
+            for await (const chunk of output) {
+                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+
+            const buffer = Buffer.concat(chunks);
+            const contentString = buffer.toString().trim();
+
+            // Check if the stream was actually just a string URL
+            if (contentString.startsWith('http')) {
+                console.log("✅ [AI] Strategy 4 Success: Stream was actually a URL string.");
+                return contentString;
+            }
+
+            // If it's actual image bytes, upload to Cloudinary
+            if (buffer.length > 0) {
+                console.log(`📤 [AI] Strategy 4 Success: Stream was image data (${buffer.length} bytes). Uploading...`);
+                const uploadResult = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream(
+                        { folder: "ai_studio_final" }, 
+                        (error, result) => {
+                            if (error) reject(error); else resolve(result);
+                        }
+                    ).end(buffer);
+                });
+                return uploadResult.secure_url;
+            }
+        } catch (streamError) {
+            console.error("❌ [AI] Strategy 4 (Stream) failed:", streamError.message);
+        }
+
+        // If all strategies fail
+        throw new Error(`AI returned unparseable format: ${JSON.stringify(output).substring(0, 100)}`);
 
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
