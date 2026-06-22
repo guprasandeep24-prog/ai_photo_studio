@@ -5,17 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My AI Gallery | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-900 text-white min-h-screen font-sans">
-
-    <!-- Navbar -->
     <nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center gap-2">
-                <div class="bg-blue-600 p-2 rounded-lg">
-                    <i class="fas fa-magic text-white"></i>
-                </div>
+                <div class="bg-blue-600 p-2 rounded-lg"><i class="fas fa-magic text-white"></i></div>
                 <h1 class="text-xl font-bold tracking-tight">AI Photo Studio</h1>
             </div>
             <div class="flex items-center gap-4">
@@ -45,18 +41,21 @@
     </header>
 
     <main class="container mx-auto p-6 mt-4">
-        <div class="flex justify-between items-center mb-8">
+        <div class="flex justify-between items-end mb-8">
             <h3 class="text-2xl font-semibold">My AI Gallery</h3>
             <span id="photo-count" class="text-gray-400 text-sm">0 Photos</span>
         </div>
 
+        <!-- Loader -->
         <div id="loader" class="flex flex-col items-center justify-center py-20">
             <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             <p class="mt-4 text-gray-500">Fetching your magic...</p>
         </div>
 
+        <!-- Gallery Grid -->
         <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
 
+        <!-- Empty State -->
         <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
             <div class="bg-gray-800 p-6 rounded-full mb-4">
                 <i class="fas fa-image text-5xl text-gray-600"></i>
@@ -67,10 +66,24 @@
         </div>
     </main>
 
-    <script>
-    // 🚀 SABSE IMPORTANT: Localhost ko hata kar Render ka URL daalein
-    const BASE_URL = "https://ai-photo-e3so.onrender.com"; 
-        const MY_USER_ID = "nSVQauCvs7SvzNXKh30sqkpu3xB3"; 
+    <script type="module">
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
+        const firebaseConfig = { 
+            apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA", 
+            authDomain: "ai-photo-studio-a8a34.firebaseapp.com", 
+            projectId: "ai-photo-studio-a8a34", 
+            storageBucket: "ai-photo-studio-a8a34.firebasestorage.app", 
+            messagingSenderId: "416743083671", 
+            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2" 
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // ✅ CORRECT URL (With -studio)
+        const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
         const galleryGrid = document.getElementById('gallery-grid');
         const loader = document.getElementById('loader');
@@ -78,15 +91,29 @@
         const photoCountLabel = document.getElementById('photo-count');
         const creditCountLabel = document.getElementById('credit-count');
 
-        async function loadDashboard() {
-            try {
-                // 1. Fetch Profile (For Credits)
-                const profileRes = await fetch(`https://ai-photo-e3so.onrender.com/user-profile/${MY_USER_ID}`);
-                const profileData = await profileRes.json();
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                loadDashboard(user.uid);
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
 
-                // 2. Fetch Photos
-                const res = await fetch(`https://ai-photo-e3so.onrender.com/my-photos?userId=${MY_USER_ID}`);
-                const photos = await res.json();
+        async function loadDashboard(userId) {
+            try {
+                // Fetching both profile and photos simultaneously
+                const [profileRes, photoRes] = await Promise.all([
+                    fetch(`${BASE_URL}/user-profile/${userId}`),
+                    fetch(`${BASE_URL}/my-photos?userId=${userId}`)
+                ]);
+
+                // Check if both responses are OK
+                if (!profileRes.ok || !photoRes.ok) {
+                    throw new Error("Failed to fetch data from server.");
+                }
+
+                const profileData = await profileRes.json();
+                const photos = await photoRes.json();
 
                 loader.classList.add('hidden');
 
@@ -94,49 +121,39 @@
                 if (profileData.success) {
                     creditCountLabel.innerText = `Credits: ${profileData.credits}`;
                 } else {
-                    creditCountLabel.innerText = "Credits: 0";
+                    creditCountLabel.innerText = `Credits: 0`;
                 }
 
-                // Show Photos
-                if (!photos || photos.length === 0) {
+                // Update Gallery
+                if (photos && photos.length > 0) {
+                    photoCountLabel.innerText = `${photos.length} Photos`;
+                    emptyState.classList.add('hidden');
+                    galleryGrid.innerHTML = photos.map(p => `
+                        <div class="bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700">
+                            <div class="relative group">
+                                <img src="${p.aiImageUrl}" class="w-full h-64 object-cover" alt="AI Generated">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center">
+                                    <a href="${p.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a>
+                                </div>
+                            </div>
+                            <div class="p-4 flex justify-between items-center">
+                                <span class="text-xs text-gray-400 capitalize">${p.category}</span>
+                                <span class="text-[10px] text-gray-500">${new Date(p.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
                     emptyState.classList.remove('hidden');
                     photoCountLabel.innerText = "0 Photos";
-                    return;
+                    galleryGrid.innerHTML = "";
                 }
 
-                photoCountLabel.innerText = `${photos.length} Photos`;
-                galleryGrid.innerHTML = '';
-
-                photos.forEach(photo => {
-                    const card = document.createElement('div');
-                    card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                    card.innerHTML = `
-                        <div class="relative overflow-hidden">
-                            <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover" alt="AI Photo">
-                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3">
-                                <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">
-                                    View Full
-                                </a>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
-                                <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
-                            </div>
-                        </div>
-                    `;
-                    galleryGrid.appendChild(card);
-                });
-
             } catch (error) {
-                console.error(error);
+                console.error("Dashboard Error:", error);
                 loader.classList.add('hidden');
-                galleryGrid.innerHTML = `<p class="col-span-full text-center text-red-500">Error: ${error.message}</p>`;
+                alert("Error loading dashboard. Please check your internet or try again later.");
             }
         }
-
-        loadDashboard();
     </script>
 </body>
 </html>

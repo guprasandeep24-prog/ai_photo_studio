@@ -1,10 +1,25 @@
 const mongoose = require('mongoose');
 
+// 1. UserSchema ko sahi se define karna zaroori hai
 const UserSchema = new mongoose.Schema({
-    firebaseUid: { type: String, required: true, unique: true }, // Firebase se aayega
-    email: { type: String },
-    credits: { type: Number, default: 0 }, // USER KA WALLET YAHAN HOGA
-    createdAt: { type: Date, default: Date.now }
+    email: { 
+        type: String, 
+        required: true, 
+        unique: true 
+    },
+    firebaseUid: { 
+        type: String, 
+        required: true, 
+        unique: true 
+    },
+    credits: { 
+        type: Number, 
+        default: 10 
+    }
+}, { 
+    timestamps: true 
 });
 
-module.exports = mongoose.model('User', UserSchema);
+// 2. Model ko export karna
+const User = mongoose.model('User', UserSchema);
+module.exports = User;

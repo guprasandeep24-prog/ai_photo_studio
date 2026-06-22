@@ -3,404 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Photo Studio | Professional AI Transformation</title>
+    <title>AI Photo Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; }
         .category-card:hover { transform: translateY(-8px); transition: all 0.3s ease; }
         .gender-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
-
-    <!-- Navbar -->
     <nav class="container mx-auto px-6 py-6 flex justify-between items-center">
         <div class="text-2xl font-bold text-indigo-600">AI <span class="text-slate-800">PhotoStudio</span></div>
-        
         <div id="auth-buttons">
-            <button onclick="toggleAuthModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold hover:bg-indigo-700 transition">
-                Login / Sign Up
-            </button>
+            <button id="loginBtn" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold hover:bg-indigo-700 transition">Login / Sign Up</button>
         </div>
-
         <div id="user-profile" class="hidden flex items-center gap-4">
             <span id="user-email" class="text-sm font-medium text-slate-600"></span>
-            <button onclick="handleLogout()" class="text-sm text-red-500 font-bold hover:underline">Logout</button>
+            <button id="logoutBtn" class="text-sm text-red-500 font-bold hover:underline">Logout</button>
         </div>
     </nav>
 
-    <!-- Hero Section -->
     <header class="container mx-auto px-6 py-12 text-center">
-        <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6">
-            Get Professional Photos in <span class="text-indigo-600">Seconds</span>
-        </h1>
-        <p class="text-lg text-slate-600 mb-10 max-w-2xl mx-auto">
-            Choose a category, select gender, upload your selfie, and let our AI handle the rest.
-        </p>
+        <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6">Get Professional Photos in <span class="text-indigo-600">Seconds</span></h1>
+        <p class="text-lg text-slate-600 mb-10 max-w-2xl mx-auto">Choose a category, select gender, upload your selfie, and let our AI handle the rest.</p>
     </header>
 
-    <!-- Dashboard / Gallery Section -->
     <section id="dashboard-section" class="hidden container mx-auto px-6 py-10">
         <div class="flex justify-between items-end mb-8">
-            <div>
-                <h2 class="text-3xl font-bold text-slate-900">My AI Gallery</h2>
-                <p class="text-slate-500">Your transformed professional photos</p>
-            </div>
-            <button onclick="showUploadSection()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition">
-                <i class="fa-solid fa-plus mr-2"></i> Create New
-            </button>
+            <div><h2 class="text-3xl font-bold text-slate-900">My AI Gallery</h2><p class="text-slate-500">Your transformed professional photos</p></div>
+            <button onclick="showUploadSection()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition"><i class="fa-solid fa-plus mr-2"></i> Create New</button>
         </div>
         <div id="photo-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             <p id="no-photos-msg" class="col-span-full text-center text-slate-400 py-10">No photos generated yet. Start creating!</p>
         </div>
     </section>
 
-    <!-- Category Section -->
     <section id="categories-section" class="container mx-auto px-6 py-10">
         <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">Select a Category</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div onclick="selectCategory('linkedin')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center">
-                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-briefcase"></i></div>
-                <h3 class="text-xl font-bold mb-2">LinkedIn</h3>
-                <p class="text-slate-500 text-sm">Corporate Suits & Office Look</p>
-            </div>
-            <div onclick="selectCategory('wedding')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center">
-                <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-crown"></i></div>
-                <h3 class="text-xl font-bold mb-2">Wedding</h3>
-                <p class="text-slate-500 text-sm">Royal Traditional Outfits</p>
-            </div>
-            <div onclick="selectCategory('fashion')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center">
-                <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-shirt"></i></div>
-                <h3 class="text-xl font-bold mb-2">Fashion</h3>
-                <p class="text-slate-500 text-sm">Stylish Streetwear & Model Look</p>
-            </div>
+        <div class        class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div onclick="selectCategory('linkedin')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center"><div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-briefcase"></i></div><h3 class="text-xl font-bold mb-2">LinkedIn</h3><p class="text-slate-500 text-sm">Corporate Suits</p></div>
+            <div onclick="selectCategory('wedding')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center"><div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-crown"></i></div><h3 class="text-xl font-bold mb-2">Wedding</h3><p class="text-slate-500 text-sm">Royal Traditional</p></div>
+            <div onclick="selectCategory('fashion')" class="category-card cursor-pointer bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center"><div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"><i class="fa-solid fa-shirt"></i></div><h3 class="text-xl font-bold mb-2">Fashion</h3><p class="text-slate-500 text-sm">Stylish Streetwear</p></div>
         </div>
     </section>
 
-    <!-- Upload Section -->
     <section id="upload-section" class="hidden container mx-auto px-6 py-12">
         <div class="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border-2 border-dashed border-indigo-200 text-center">
             <button onclick="hideUploadSection()" class="float-right text-slate-400 hover:text-slate-600"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <h2 id="selected-cat-title" class="text-2xl font-bold mb-2 text-indigo-600 pt-4">Upload Photo</h2>
-            
-            <div class="mb-8">
-                <p class="text-slate-500 text-sm mb-3">Select Gender</p>
-                <div class="flex justify-center gap-4">
-                    <button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Man</button>
-                    <button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button>
-                </div>
-            </div>
-
+            <div class="mb-8"><p class="text-slate-500 text-sm mb-3">Select Gender</p><div class="flex justify-center gap-4"><button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Man</button><button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button></div></div>
             <input type="file" id="imageInput" class="hidden" accept="image/*">
-            <div id="preview-container" class="hidden mb-6">
-                <img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg">
-            </div>
-
-            <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition mb-4">
-                <i class="fa-solid fa-image mr-2"></i> Choose Image
-            </button>
-
-            <button id="submitBtn" class="hidden w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition">
-                Generate My Photo <i class="fa-solid fa-magic ml-2"></i>
-            </button>
+            <div id="preview-container" class="hidden mb-6"><img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg"></div>
+            <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition mb-4"><i class="fa-solid fa-image mr-2"></i> Choose Image</button>
+            <button id="submitBtn" class="hidden w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
         </div>
     </section>
 
-    <!-- Loading Modal -->
-    <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-50">
-        <div class="bg-white p-10 rounded-3xl text-center">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
-            <h2 class="text-xl font-bold">AI is Working...</h2>
-            <p class="text-slate-500 text-sm">This takes about 45-60 seconds</p>
-        </div>
-    </div>
+    <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-50"><div class="bg-white p-10 rounded-3xl text-center"><div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div><h2 class="text-xl font-bold">AI is Working...</h2><p class="text-slate-500 text-sm">This takes about 45-60 seconds</p></div></div>
 
-    <!-- Success Modal -->
     <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl">
-            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                <i class="fa-solid fa-check"></i>
-            </div>
-            <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
-            <p class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-            <div class="relative group mb-6">
-                <img id="resultImage" src="" alt="AI Result" class="w-full h-64 object-cover rounded-2xl border-2 border-slate-100 shadow-inner">
-            </div>
-            <div class="flex flex-col gap-3">
-                <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
-                    <i class="fa-solid fa-download mr-2"></i> Download
-                </a>
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
-                    Try Another
-                </button>
-            </div>
-        </div>
+        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl"><div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div><h2 class="text-2xl font-bold mb-1">Magic Done!</h2><p class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p><div class="relative group mb-6"><img id="resultImage" src="" class="w-full h-64 object-cover rounded-2xl border-2 border-slate-100 shadow-inner"></div><div class="flex flex-col gap-3"><a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a><button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try Another</button></div></div>
     </div>
 
-    <!-- Auth Modal -->
-    <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
-        <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative">
-            <button onclick="toggleAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <h2 id="auth-title" class="text-3xl font-bold text-slate-900 mb-2 text-center">Welcome Back</h2>
-            <p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Login to your account to continue</p>
-            <form id="authForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-                    <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                    <input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition">
-                </div>
-                <button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition mt-4">
-                    Login
-                </button>
-            </form>
-            <div class="mt-6 text-center text-sm text-slate-500">
-                <span id="auth-toggle-text">Don't have an account?</span>
-                <button type="button" onclick="switchAuthMode()" id="auth-switch-btn" class="text-indigo-600 font-bold hover:underline ml-1">Sign Up</button>
-            </div>
-        </div>
-    </div>
+    <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4"><div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative"><button id="closeAuthBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fa-solid fa-xmark"></i></button><h2 id="auth-title" class="text-3xl font-bold text-slate-900 mb-2 text-center">Welcome Back</h2><p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Login to your account to continue</p><form id="authForm" class="space-y-4"><div class=""><label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label><input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"></div><div><label class="block text-sm font-medium text-slate-700 mb-1">Password</label><input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"></div><button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition mt-4">Login</button></form><div class="mt-6 text-center text-sm text-slate-500"><span id="auth-toggle-text">Don't have an account?</span><button type="button" id="auth-switch-btn" class="text-indigo-600 font-bold hover:underline ml-1">Sign Up</button></div></div></div>
 
-    <!-- Scripts -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    
     <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { 
-        getAuth, 
-        onAuthStateChanged, 
-        createUserWithEmailAndPassword, 
-        signInWithEmailAndPassword, 
-        signOut 
-    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
-        authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
-        projectId: "ai-photo-studio-a8a34",
-        storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
-        messagingSenderId: "416743083671",
-        appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
-        measurementId: "G-HRKKHJKDJ8"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
+            authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
+            projectId: "ai-photo-studio-a8a34",
+            storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
+            messagingSenderId: "416743083671",
+            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
+            measurementId: "G-HRKKHJKDJ8"
+        };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-
-    // 🚀 SABSE IMPORTANT: Render ka URL yahan hai
-    const BASE_URL = "https://ai-photo-e3so.onrender.com";
-
-    // --- GLOBAL VARIABLES ---
-    window.selectedCategory = "";
-    window.selectedGender = "";
-    window.selectedFile = null; 
-    window.isLoginMode = true; 
-
-    // --- 1. AUTH FUNCTIONS ---
-    window.toggleAuthModal = () => {
-        document.getElementById('authModal').classList.toggle('hidden');
-    };
-
-    window.switchAuthMode = () => {
-        window.isLoginMode = !window.isLoginMode;
-        const title = document.getElementById('auth-title');
-        const subtitle = document.getElementById('auth-subtitle');
-        const btn = document.getElementById('authSubmitBtn');
-        const toggleText = document.getElementById('auth-toggle-text');
-        const switchBtn = document.getElementById('auth-switch-btn');
-
-        if (window.isLoginMode) {
-            title.innerText = "Welcome Back";
-            subtitle.innerText = "Login to your account to continue";
-            btn.innerText = "Login";
-            toggleText.innerText = "Don't have an account?";
-            switchBtn.innerText = "Sign Up";
-        } else {
-            title.innerText = "Create Account";
-            subtitle.innerText = "Join us to start generating AI photos";
-            btn.innerText = "Sign Up";
-            toggleText.innerText = "Already have an account?";
-            switchBtn.innerText = "Login";
-        }
-    };
-
-    document.getElementById('authForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('authEmail').value;
-        const password = document.getElementById('authPassword').value;
-        try {
-            if (window.isLoginMode) {
-                await signInWithEmailAndPassword(auth, email, password);
-            } else {
-                await createUserWithEmailAndPassword(auth, email, password);
-            }
-            toggleAuthModal();
-        } catch (error) {
-            alert("Auth Error: " + error.message);
-        }
-    });
-
-    window.handleLogout = async () => {
-        await signOut(auth);
-        location.reload();
-    };
-
-    // --- 2. UI NAVIGATION FUNCTIONS ---
-    window.selectCategory = (cat) => {
-        window.selectedCategory = cat;
-        window.selectedGender = "";
-        document.getElementById('btn-man').classList.remove('active');
-        document.getElementById('btn-woman').classList.remove('active');
-        document.getElementById('upload-section').classList.remove('hidden');
-        document.getElementById('categories-section').classList.add('hidden');
-        document.getElementById('dashboard-section').classList.add('hidden');
-        document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
-        document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
-    };
-
-    window.selectGender = (gender) => {
-        window.selectedGender = gender;
-        document.getElementById('btn-man').classList.toggle('active', gender === 'man');
-        document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
-    };
-
-    window.showUploadSection = () => {
-        document.getElementById('upload-section').classList.remove('hidden');
-        document.getElementById('categories-section').classList.add('hidden');
-        document.getElementById('dashboard-section').classList.add('hidden');
-    };
-
-    window.hideUploadSection = () => {
-        document.getElementById('upload-section').classList.add('hidden');
-        document.getElementById('categories-section').classList.remove('hidden');
-    };
-
-    // --- 3. AUTH STATE LISTENER ---
-    onAuthStateChanged(auth, async (user) => {
-        const authButtons = document.getElementById('auth-buttons');
-        const userProfile = document.getElementById('user-profile');
-        const userEmailSpan = document.getElementById('user-email');
-        const categoriesSection = document.getElementById('categories-section');
-        const uploadSection = document.getElementById('upload-section');
-        const dashboardSection = document.getElementById('dashboard-section');
-
-        if (user) {
-            console.log("✅ [AUTH] User logged in:", user.email);
-            authButtons.classList.add('hidden');
-            userProfile.classList.remove('hidden');
-            userEmailSpan.innerText = user.email;
-            dashboardSection.classList.remove('hidden');
-            categoriesSection.classList.add('hidden');
-            uploadSection.classList.add('hidden');
-            fetchUserPhotos(user.uid);
-        } else {
-            authButtons.classList.remove('hidden');
-            userProfile.classList.add('hidden');
-            dashboardSection.classList.add('hidden');
-            uploadSection.classList.add('hidden');
-            categoriesSection.classList.remove('hidden');
-        }
-    });
-
-    async function fetchUserPhotos(userId) {
-        const grid = document.getElementById('photo-grid');
-        const noPhotosMsg = document.getElementById('no-photos-msg');
-        try {
-            // 🚀 FIXED: Using BASE_URL instead of localhost
-            const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
-            const photos = await response.json();
-
-            if (photos && photos.length > 0) {
-                noPhotosMsg.classList.add('hidden');
-                grid.innerHTML = ""; 
-                photos.forEach(photo => {
-                    const card = document.createElement('div');
-                    card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                    card.innerHTML = `
-                        <div class="relative overflow-hidden">
-                            <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover" alt="AI Photo">
-                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3">
-                                <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">
-                                    View Full
-                                </a>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
-                                <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
-                            </div>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                });
-            } else {
-                noPhotosMsg.classList.remove('hidden');
-                grid.innerHTML = "";
-            }
-        } catch (error) {
-            console.error("Error fetching photos:", error);
-        }
-    }
-
-    // --- 4. IMAGE & PAYMENT LOGIC ---
-    document.getElementById('imageInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            window.selectedFile = file;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                document.getElementById('imagePreview').src = event.target.result;
-                document.getElementById('preview-container').classList.remove('hidden');
-                document.getElementById('submitBtn').classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
-    document.getElementById('submitBtn').addEventListener('click', async function() {
-        if (!window.selectedGender) return alert("Please select Gender!");
-        if (!window.selectedFile) return alert("Please select an image!");
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         
-        const user = auth.currentUser;
-        if (!user) return alert("Please Login first!");
+        // ✅ YAHAN CHECK KAREIN: Kya ye wahi hai jo Render par hai?
+        const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
-        const formData = new FormData();
-        formData.append('image', window.selectedFile);
-        formData.append('category', window.selectedCategory);
-        formData.append('gender', window.selectedGender);
-        formData.append('userId', user.uid); // ✅ FIXED: userId is now added correctly
+        // 🕵️ DEBUGGING: Website kholne ke baad Console mein check karein ki URL sahi hai ya nahi
+        console.log("🚀 CURRENT BASE_URL IS:", BASE_URL);
 
-        document.getElementById('loadingModal').classList.remove('hidden');
+        window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.isLoginMode = true;
 
-        try {
-            // 🚀 FIXED: Using BASE_URL instead of localhost
-            const response = await fetch(`${BASE_URL}/upload`, {
-                method: 'POST',
-                body: formData 
-            });
+        window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
+        window.switchAuthMode = () => {
+            window.isLoginMode = !window.isLoginMode;
+            document.getElementById('auth-title').innerText = window.isLoginMode ? "Welcome Back" : "Create Account";
+            document.getElementById('auth-subtitle').innerText = window.isLoginMode ? "Login to your account to continue" : "Join us to start generating AI photos";
+            document.getElementById('authSubmitBtn').innerText = window.isLoginMode ? "Login" : "Sign Up";
+            document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
+            document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
+        };
 
-            const result = await response.json();
-            if (result.success) {
-                document.getElementById('resultImage').src = result.ai_image_url;
-                document.getElementById('downloadBtn').href = result.ai_image_url;
-                document.getElementById('successModal').classList.remove('hidden');
-                document.getElementById('loadingModal').classList.add('hidden');
-            } else {
-                throw new Error(result.error || "AI Generation failed");
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            try {
+                if (window.isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    const signUpResult = await createUserWithEmailAndPassword(auth, email, password);
+                    const newUser = signUpResult.user;
+
+                    console.log("Registering user in MongoDB...");
+                    const regRes = await fetch(`${BASE_URL}/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: newUser.email, firebaseUid: newUser.uid })
+                    });
+                    const regData = await regRes.json();
+                    if (!regData.success) throw new Error("Registration failed!");
+                }
+                toggleAuthModal();
+            } catch (error) { 
+                console.error(error);
+                alert("Auth Error: " + error.message); 
             }
-        } catch (error) {
-            console.error("Upload error:", error);
-            alert("Error: " + error.message);
-            document.getElementById('loadingModal').classList.add('hidden');
+        });
+
+        window.handleLogout = async () => { await signOut(auth); location.reload(); };
+
+        window.selectCategory = (cat) => {
+            window.selectedCategory = cat; window.selectedGender = "";
+            document.getElementById('btn-man').classList.remove('active');
+            document.getElementById('btn-woman').classList.remove('active');
+            document.getElementById('upload-section').classList.remove('hidden');
+            document.getElementById('categories-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+            document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
+        };
+
+        window.selectGender = (gender) => {
+            window.selectedGender = gender;
+            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
+            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+        };
+
+        window.showUploadSection = () => {
+            document.getElementById('upload-section').classList.remove('hidden');
+            document.getElementById('categories-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+        };
+
+        window.hideUploadSection = () => {
+            document.getElementById('upload-section').classList.add('hidden');
+            document.getElementById('categories-section').classList.remove('hidden');
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            const authButtons = document.getElementById('auth-buttons');
+            const userProfile = document.getElementById('user-profile');
+            const userEmailSpan = document.getElementById('user-email');
+            const categoriesSection = document.getElementById('categories-section');
+            const uploadSection = document.getElementById('upload-section');
+            const dashboardSection = document.getElementById('dashboard-section');
+
+            if (user) {
+                authButtons.classList.add('hidden');
+                userProfile.classList.remove('hidden');
+                userEmailSpan.innerText = user.email;
+                dashboardSection.classList.remove('hidden');
+                categoriesSection.classList.add('hidden');
+                uploadSection.classList.add('hidden');
+                fetchUserPhotos(user.uid);
+            } else {
+                authButtons.classList.remove('hidden');
+                userProfile.classList.add('hidden');
+                dashboardSection.classList.add('hidden');
+                uploadSection.classList.add('hidden');
+                categoriesSection.classList.remove('hidden');
+            }
+        });
+
+        async function fetchUserPhotos(userId) {
+            const grid = document.getElementById('photo-grid');
+            const noPhotosMsg = document.getElementById('no-photos-msg');
+            try {
+                const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
+                const photos = await response.json();
+                if (photos && photos.length > 0) {
+                    noPhotosMsg.classList.add('hidden');
+                    grid.innerHTML = "";
+                    photos.forEach(photo => {
+                        const card = document.createElement('div');
+                        card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
+                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span><span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
+                        grid.appendChild(card);
+                    });
+                } else {
+                    noPhotosMsg.classList.remove('hidden');
+                    grid.innerHTML = "";
+                }
+            } catch (error) { console.error(error); }
         }
-    });
-</script>
+
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                window.selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.getElementById('imagePreview').src = event.target.result;
+                    document.getElementById('preview-container').classList.remove('hidden');
+                    document.getElementById('submitBtn').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            const currentUser = auth.currentUser;
+            if (!window.selectedGender || !window.selectedFile || !currentUser) {
+                return alert("Please select gender, image and login first!");
+            }
+
+            document.getElementById('loadingModal').classList.remove('hidden');
+            const formData = new FormData();
+            formData.append('image', window.selectedFile);
+            formData.append('category', window.selectedCategory);
+            formData.append('gender', window.selectedGender);
+            formData.append('userId', currentUser.uid);
+
+            try {
+                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('resultImage').src = result.ai_image_url;
+                    document.getElementById('downloadBtn').href = result.ai_image_url;
+                    document.getElementById('successModal').classList.remove('hidden');
+                    document.getElementById('loadingModal').classList.add('hidden');
+                } else { throw new Error(result.error || "AI Generation failed"); }
+            } catch (error) {
+                alert("Error: " + error.message);
+                document.getElementById('loadingModal').classList.add('hidden');
+            }
+        });
+
+        // Event Listeners for Buttons
+        document.getElementById('loginBtn').addEventListener('click', () => toggleAuthModal());
+        document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
+        document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
+        document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
+
+    </script>
 </body>
 </html>
