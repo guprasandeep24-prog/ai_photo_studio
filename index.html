@@ -231,9 +231,8 @@ window.showUploadSection = () => {
             const currentUser = auth.currentUser;
             if (!window.selectedCategory) return alert("⚠️ Please select a Category first!"); // <--- YE ADD KAREIN
     if (!window.selectedGender) return alert("⚠️ Please select Gender!");
-    if (!window.selectedFile) return alert("⚠️ Please select an image!"); {
-                return alert("Please select gender, image and login first!");
-            }
+    if (!window.selectedFile) return alert("⚠️ Please select an image!"); 
+            
 
             document.getElementById('loadingModal').classList.remove('hidden');
             const formData = new FormData();
