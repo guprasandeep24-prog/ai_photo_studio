@@ -63,7 +63,7 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🚀 SUPER FLEXIBLE AI LOGIC (Handles all Replicate formats)
+// 🚀 ULTIMATE STREAM-PROOF AI LOGIC
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     
@@ -82,38 +82,60 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         );
 
-        // 🔍 DEBUGGING: Sabse pehle check karo ki Replicate asliyat mein kya bhej raha hai
-        console.log("📦 [AI] RAW OUTPUT FROM REPLICATE:", JSON.stringify(output));
+        console.log("📦 [AI] RAW OUTPUT RECEIVED (Type check):", typeof output);
 
-        let finalUrl = "";
+        // --- 🛠️ THE SMART STREAM HANDLER ---
+        
+        // Case 1: Agar output ek Stream hai (Jaisa aapke logs mein dikha)
+        if (output && typeof output[Symbol.asyncIterator] === 'function') {
+            console.log("🌊 [AI] Detected a Stream! Collecting chunks into a bucket...");
+            const chunks = [];
+            for await (const chunk of output) {
+                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            const buffer = Buffer.concat(chunks);
 
-        // --- SMART PARSING LOGIC ---
+            // Check if the buffer is actually just a string (URL)
+            const potentialUrl = buffer.toString().trim();
+            if (potentialUrl.startsWith('http')) {
+                console.log("🔗 [AI] Stream was actually a URL string. Using it.");
+                return potentialUrl;
+            }
+
+            // Otherwise, it's the actual image data. Upload to Cloudinary.
+            console.log("📤 [AI] Stream was image data. Uploading buffer to Cloudinary...");
+            const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream(
+                    { folder: "ai_studio_final" }, 
+                    (error, result) => {
+                        if (error) reject(error); else resolve(result);
+                    }
+                ).end(buffer);
+            });
+            return uploadResult.secure_url;
+        }
+
+        // Case 2: Agar output seedha String hai
         if (typeof output === 'string') {
-            // Format 1: "https://..."
-            finalUrl = output;
-        } 
-        else if (Array.isArray(output) && output.length > 0) {
-            // Format 2: ["https://..."]
-            finalUrl = output[0];
-        } 
-        else if (typeof output === 'object' && output !== null) {
-            // Format 3: { "output": "https://..." } ya { "url": "https://..." }
-            // Hum sabse common keys check kar rahe hain
-            finalUrl = output.output || output.url || output.image || (Array.isArray(output) ? output[0] : "");
+            return output;
         }
 
-        // Final Validation: Kya humein ek valid URL mila?
-        if (!finalUrl || typeof finalUrl !== 'string' || !finalUrl.startsWith('http')) {
-            console.error("❌ [AI] Validation failed. Output was:", output);
-            throw new Error("AI returned an invalid or empty image URL. Please try again.");
+        // Case 3: Agar output Array hai
+        if (Array.isArray(output) && output.length > 0) {
+            return output[0];
         }
 
-        console.log("🚀 [AI] Success! Final Image URL:", finalUrl);
-        return finalUrl;
+        // Case 4: Agar output Object hai
+        if (typeof output === 'object' && output !== null) {
+            const url = output.output || output.url || output.image;
+            if (url) return url;
+        }
+
+        throw new Error("AI returned an unrecognizable format.");
 
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
-        throw error; // Error ko upload route tak pahunchne dein
+        throw error;
     }
 }
 
