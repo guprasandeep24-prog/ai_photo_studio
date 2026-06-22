@@ -1,14 +1,17 @@
 const mongoose = require('mongoose');
 
-const OrderSchema = new mongoose.Schema({
-    userId: { type: String, required: true }, // Firebase UID
+// models/Order.js mein change karein
+
+const orderSchema = new mongoose.Schema({
+    userId: { type: String, required: true },
     category: { type: String, required: true },
     gender: { type: String, required: true },
     aiImageUrl: { type: String, required: true },
-    razorpayOrderId: { type: String, required: true, unique: true },
-    razorpayPaymentId: { type: String },
-    status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
-    createdAt: { type: Date, default: Date.now }
-});
+    status: { type: String, default: 'completed' },
+    // ❌ PURANA: razorpayOrderId: { type: String, unique: true }
+    // ✅ NAYA: Unique hata diya taaki multiple "N/A" allow ho sakein
+    razorpayOrderId: { type: String, default: 'N/A' } 
+}, { timestamps: true });
+
 
 module.exports = mongoose.model('Order', OrderSchema);
