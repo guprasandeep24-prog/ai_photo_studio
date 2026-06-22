@@ -8,19 +8,29 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
 
-// 1. Models Import
 const Order = require('./models/Order');
 const User = require('./models/User'); 
 const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// 2. Middleware (ORDER IS VERY IMPORTANT!)
-// CORS ko sabse upar rakhiye taaki koi error na aaye
-app.use(cors()); 
+// --- 1. IMPROVED CORS ---
+// Replace 'https://your-username.github.io' with your actual GitHub Pages URL
+app.use(cors({
+    origin: '*', // Temporary: Sabko allow karo testing ke liye. Baad mein apna URL daal dena.
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
+
+// Static folders
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/templates', express.static(path.join(__dirname, 'templates')));
+
+// --- 2. HEALTH CHECK ROUTE (Very Important for Testing) ---
+app.get('/', (req, res) => {
+    res.send("🚀 AI Photo Studio Backend is LIVE and running!");
+});
 
 // 3. Initialization
 console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
@@ -53,61 +63,62 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 4. AI Logic
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     const output = await replicate.run("pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } });
-    if (output && typeof output[Symbol.asyncIterator] === 'function') {
-        const chunks = [];
-        for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
-        const buffer = Buffer.concat(chunks);
-        const uploadResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream({ folder: "ai_studio_final" }, (error, result) => {
-                if (error) reject(error); else resolve(result);
-            }).end(buffer);
-        });
-        return uploadResult.secure_url;
+    
+    if (output) {
+        // Replicate output handling
+        const finalUrl = Array.isArray(output) ? output[0] : output;
+        return finalUrl;
     }
-    return Array.isArray(output) ? output[0] : output;
+    throw new Error("AI Generation failed to return image");
 }
 
-// 5. ROUTES
-// 🚀 ROUTE 1: AI Generation
+// --- 4. ROUTES ---
+
+// ROUTE 1: AI Generation
 app.post('/upload', upload.single('image'), async (req, res) => {
-    console.log("📥 [UPLOAD] Received request for /upload");
+    console.log("📥 [UPLOAD] Request received for /upload");
     let localFilePath = req.file ? req.file.path : null; 
     try {
         const { category, gender, userId } = req.body;
+        
         if (!localFilePath || !category || !gender || !userId) {
-            console.log("❌ [UPLOAD] Missing fields:", { localFilePath, category, gender, userId });
+            console.log("❌ [UPLOAD] Missing fields:", { category, gender, userId, hasFile: !!localFilePath });
             return res.status(400).json({ success: false, error: "Missing info or User ID!" });
         }
 
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits < 1) {
-            return res.status(402).json({ success: false, error: "Insufficient credits!" });
-        }
+        if (!user) return res.status(404).json({ success: false, error: "User not found in database!" });
+        if (user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
 
+        // 1. Upload to Cloudinary
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
+        
+        // 2. Run AI
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
+        // 3. Update User & Order
         user.credits -= 1;
         await user.save();
 
         await Order.create({ userId, category, gender, aiImageUrl: finalAiImageUrl, status: 'completed', razorpayOrderId: 'N/A' });
 
+        // 4. Cleanup
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
+        
+        console.log("✅ [UPLOAD] Success for user:", userId);
         res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
     } catch (error) {
+        console.error("❌ [UPLOAD ERROR]:", error);
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 🚀 ROUTE 2: Payments
 app.use('/api/payments', paymentRoutes);
 
-// 🚀 ROUTE 3: Profile
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         const user = await User.findOne({ firebaseUid: req.params.userId });
@@ -118,32 +129,18 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// 🚀 ROUTE 4: Gallery
 app.get('/my-photos', async (req, res) => {
     try {
         const { userId } = req.query;
+        if(!userId) return res.status(400).json({success: false, error: "userId required"});
         const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// 🚀 DEBUGGING: Check if routes are actually registered
-console.log("🔍 CURRENT ACTIVE ROUTES:");
-console.log("---");
-console.log("1. POST /upload");
-console.log("2. GET  /user-profile/:userId");
-console.log("3. GET  /my-photos");
-console.log("4. POST /api/payments/create-order");
-console.log("5. POST /api/payments/verify-payment");
-console.log("---");
 
-// 🛠️ DEBUGGING: Print all registered routes on startup
-app.listen(process.env.PORT || 5000, () => {
-    console.log(`✅ [SYSTEM] AI STUDIO ENGINE LIVE AT http://localhost:${process.env.PORT || 5000}`);
-    console.log("📜 REGISTERED ROUTES:");
-    console.log("- POST /upload");
-    console.log("- GET  /user-profile/:userId");
-    console.log("- GET  /my-photos");
-    console.log("- /api/payments (handled by paymentRoutes)");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`);
 });
