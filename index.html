@@ -150,11 +150,16 @@
             document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
         };
 
-        window.showUploadSection = () => {
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('categories-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-        };
+        // ✅ NAYA (Jo user ko wapas Categories dikhayega)
+window.showUploadSection = () => {
+    // Hum user ko seedha categories dikhayenge taaki wo pehle category chun sakein
+    document.getElementById('categories-section').classList.remove('hidden');
+    document.getElementById('dashboard-section').classList.add('hidden');
+    document.getElementById('upload-section').classList.add('hidden');
+    window.selectedCategory = ""; // Reset category
+    window.selectedGender = "";   // Reset gender
+};
+
 
         window.hideUploadSection = () => {
             document.getElementById('upload-section').classList.add('hidden');
@@ -224,7 +229,9 @@
 
         document.getElementById('submitBtn').addEventListener('click', async function() {
             const currentUser = auth.currentUser;
-            if (!window.selectedGender || !window.selectedFile || !currentUser) {
+            if (!window.selectedCategory) return alert("⚠️ Please select a Category first!"); // <--- YE ADD KAREIN
+    if (!window.selectedGender) return alert("⚠️ Please select Gender!");
+    if (!window.selectedFile) return alert("⚠️ Please select an image!"); {
                 return alert("Please select gender, image and login first!");
             }
 
