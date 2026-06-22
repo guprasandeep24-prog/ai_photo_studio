@@ -156,47 +156,43 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 UPDATED ROUTE 1: AI Generation (With Auto-Registration)
+// 🚀 UPDATED ROUTE 1: AI Generation (With Real Email)
 app.post('/upload', upload.single('image'), async (req, res) => {
     console.log("📥 [UPLOAD] Request received for /upload");
     let localFilePath = req.file ? req.file.path : null; 
 
     try {
-        const { category, gender, userId } = req.body;
+        // 🔍 STEP 1: Extract fields (Including real email from frontend)
+        const { category, gender, userId, email } = req.body;
+
         if (!localFilePath || !category || !gender || !userId) {
-            console.log("❌ [UPLOAD] Missing fields:", { category, gender, userId, hasFile: !!localFilePath });
             return res.status(400).json({ success: false, error: "Missing info or User ID!" });
         }
 
-        // 🔍 STEP 1: Check if user exists in MongoDB
+        // 🔍 STEP 2: Check if user exists in MongoDB
         let user = await User.findOne({ firebaseUid: userId });
 
-        // ✨ STEP 2: AUTO-REGISTRATION (If user is new)
+        // ✨ STEP 3: AUTO-REGISTRATION (Using REAL email from frontend)
         if (!user) {
-            console.log(`🆕 [NEW USER] User not found in MongoDB. Auto-creating for UID: ${userId}`);
+            console.log(`🆕 [NEW USER] Auto-creating user for UID: ${userId} with Email: ${email}`);
             user = new User({
                 firebaseUid: userId,
-                email: "new-user@example.com", // Default, frontend will update later or we can pass email
-                credits: 5 // Give 5 FREE credits to every new user!
+                email: email || "new-user@example.com", // Use real email if available
+                credits: 5 
             });
             await user.save();
             console.log("✅ [NEW USER] Created successfully with 5 credits.");
         }
 
-        // 🔍 STEP 3: Check Credits
+        // 🔍 STEP 4: Check Credits
         if (user.credits < 1) {
-            console.log(`❌ [UPLOAD] Insufficient credits for user: ${userId}`);
-            return res.status(402).json({ success: false, error: "Insufficient credits! Please buy more." });
+            return res.status(402).json({ success: false, error: "Insufficient credits!" });
         }
 
         // --- PROCEED WITH AI GENERATION ---
-        // 1. Upload to Cloudinary
         const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
-        
-        // 2. Run AI
         const finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
 
-        // 3. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
@@ -209,10 +205,8 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             razorpayOrderId: 'N/A' 
         });
 
-        // 4. Cleanup local file
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
         
-        console.log(`✅ [UPLOAD] Success! User: ${userId}, Remaining Credits: ${user.credits}`);
         res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
 
     } catch (error) {
