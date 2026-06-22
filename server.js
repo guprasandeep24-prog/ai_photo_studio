@@ -17,7 +17,7 @@ const app = express();
 
 // 2. Middleware - CORS FIX (Sabse important part)
 app.use(cors({
-    origin: " https://guprasandeep24-prog.github.io/ai_photo_studio/", // Aapka GitHub URL
+    origin: "https://guprasandeep24-prog.github.io", // Aapka GitHub URL
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
 }));
