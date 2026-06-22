@@ -63,7 +63,7 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🚀 IMPROVED & SIMPLIFIED AI LOGIC
+// 🚀 SUPER FLEXIBLE AI LOGIC (Handles all Replicate formats)
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     
@@ -72,7 +72,6 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     console.log("👤 [AI] Swapping with:", userCloudinaryUrl);
 
     try {
-        // Replicate call
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { 
@@ -83,21 +82,30 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         );
 
-        console.log("✅ [AI] Replicate Output Received:", output);
+        // 🔍 DEBUGGING: Sabse pehle check karo ki Replicate asliyat mein kya bhej raha hai
+        console.log("📦 [AI] RAW OUTPUT FROM REPLICATE:", JSON.stringify(output));
 
-        // Replicate direct URL bhej sakta hai ya array mein
         let finalUrl = "";
+
+        // --- SMART PARSING LOGIC ---
         if (typeof output === 'string') {
+            // Format 1: "https://..."
             finalUrl = output;
-        } else if (Array.isArray(output) && output.length > 0) {
+        } 
+        else if (Array.isArray(output) && output.length > 0) {
+            // Format 2: ["https://..."]
             finalUrl = output[0];
-        } else {
-            throw new Error("Unexpected output format from AI");
+        } 
+        else if (typeof output === 'object' && output !== null) {
+            // Format 3: { "output": "https://..." } ya { "url": "https://..." }
+            // Hum sabse common keys check kar rahe hain
+            finalUrl = output.output || output.url || output.image || (Array.isArray(output) ? output[0] : "");
         }
 
-        // Check if URL is valid
-        if (!finalUrl || !finalUrl.startsWith('http')) {
-            throw new Error("AI returned an invalid image URL");
+        // Final Validation: Kya humein ek valid URL mila?
+        if (!finalUrl || typeof finalUrl !== 'string' || !finalUrl.startsWith('http')) {
+            console.error("❌ [AI] Validation failed. Output was:", output);
+            throw new Error("AI returned an invalid or empty image URL. Please try again.");
         }
 
         console.log("🚀 [AI] Success! Final Image URL:", finalUrl);
@@ -105,7 +113,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
-        throw error; // Error ko aage bhejein taaki /upload catch kar sake
+        throw error; // Error ko upload route tak pahunchne dein
     }
 }
 
