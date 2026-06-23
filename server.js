@@ -156,7 +156,9 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 THE "NUCLEAR OPTION" GENERATOR ROUTE (Final & Most Robust)
+// ===========================================================
+// START OF NEW CODE (Replace the old /upload route with this)
+// ===========================================================
 app.post('/upload', upload.single('image'), async (req, res) => {
     console.log("📥 [GENERATE] Request received");
     let localFilePath = req.file ? req.file.path : null; 
@@ -171,7 +173,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         let finalAiImageUrl = "";
 
-        // --- CASE A: PROMPT-TO-IMAGE MODE ---
         if (mode === 'prompt') {
             if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required!" });
             console.log("🎨 [MODE] Prompt-to-Image active. Prompt:", prompt);
@@ -182,26 +183,16 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             );
 
             console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
-            console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
 
-            // 🚀 THE ULTIMATE DEEP SEARCH URL EXTRACTOR
             const findUrlDeeply = (obj) => {
                 if (typeof obj === 'string' && obj.startsWith('http')) return obj;
-                if (Array.isArray(obj) && obj.length > 0) {
-                    return findUrlDeeply(obj[0]); // Check first element
-                }
+                if (Array.isArray(obj) && obj.length > 0) return findUrlDeeply(obj[0]);
                 if (obj && typeof obj === 'object') {
-                    // 1. Check common keys first (for speed)
                     if (obj.url) return obj.url;
                     if (obj.output) return obj.output;
                     if (obj.image) return obj.image;
-                    
-                    // 2. Deep search: Check every single key in the object
                     for (let key in obj) {
-                        if (typeof obj[key] === 'string' && obj[key].startsWith('http')) {
-                            return obj[key];
-                        }
-                        // If nested object, recurse
+                        if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
                         if (typeof obj[key] === 'object' && obj[key] !== null) {
                             const deepResult = findUrlDeeply(obj[key]);
                             if (deepResult) return deepResult;
@@ -214,32 +205,29 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             finalAiImageUrl = findUrlDeeply(output);
 
             if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
-                console.error("❌ [AI] CRITICAL FAILURE: Could not find URL in output:", JSON.stringify(output));
+                console.error("❌ [AI] CRITICAL FAILURE: Could not extract URL. Raw Output:", JSON.stringify(output));
                 throw new Error("AI returned an unreadable format. Please try a different prompt.");
             }
 
             console.log("🔗 [AI] URL Successfully Found:", finalAiImageUrl);
 
-            // Upload to Cloudinary to make it permanent
-            console.log("☁️ [PROMPT] Uploading to Cloudinary...");
-            const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
-            finalAiImageUrl = uploadResult.secure_url;
+            if (!finalAiImageUrl.includes('cloudinary.com')) {
+                console.log("☁️ [PROMPT] Moving Replicate image to Cloudinary...");
+                const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
+                finalAiImageUrl = uploadResult.secure_url;
+            }
 
-        } 
-        // --- CASE B: FACE-SWAP MODE ---
-        else if (mode === 'faceswap') {
+        } else if (mode === 'faceswap') {
             if (!localFilePath) return res.status(400).json({ success: false, error: "Please upload an image!" });
             if (!category || !gender) return res.status(400).json({ success: false, error: "Category or Gender missing!" });
-
             console.log("👤 [MODE] Face-swap mode active.");
             const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
             finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
         } 
 
-        // --- FINAL STEP: SAVE TO DB ---
         console.log("💾 [SAVE] Saving order...");
         user.credits -= 1;
-        await user.save();
+        await user.save(); 
 
         await Order.create({ 
             userId, 
@@ -259,7 +247,9 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-
+// ===========================================================
+// END OF NEW CODE
+// ===========================================================
 app.use('/api/payments', paymentRoutes);
 
 // 🚀 IMPROVED ROUTE 3: Profile (With Auto-Registration)
