@@ -156,17 +156,15 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 ULTIMATE UNIVERSAL GENERATOR ROUTE (Fixed for Prompt & Face-Swap)
+// 🚀 ULTIMATE UNIVERSAL GENERATOR ROUTE (The "No-Fail" Version)
 app.post('/upload', upload.single('image'), async (req, res) => {
-    console.log("📥 [GENERATE] Request received for /upload");
+    console.log("📥 [GENERATE] Request received");
     let localFilePath = req.file ? req.file.path : null; 
 
     try {
         const { category, gender, userId, prompt, mode } = req.body;
-
         if (!userId) return res.status(400).json({ success: false, error: "User ID missing!" });
 
-        // 1. User Check
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found!" });
         if (user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
@@ -184,32 +182,70 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             );
 
             console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
-            console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
 
-            // 🚀 BULLETPROOF URL EXTRACTION
-            if (typeof output === 'string') {
+            // 🚀 THE ULTIMATE STREAM & DATA HANDLER
+            if (typeof output === 'string' && output.startsWith('http')) {
+                // Scenario 1: Output is already a URL string
                 finalAiImageUrl = output;
-            } else if (Array.isArray(output) && output.length > 0) {
-                finalAiImageUrl = output[0];
-            } else if (output && typeof output === 'object') {
-                // Try all possible keys Replicate might use
-                finalAiImageUrl = output.url || output.output || output.image || (output.data && output.data[0]) || "";
+            } else {
+                // Scenario 2: Output is a Stream, Array, or Object
+                let buffer;
+
+                if (typeof output[Symbol.asyncIterator] === 'function') {
+                    // It's a Stream! Let's collect all chunks
+                    console.log("🌊 [AI] Processing Stream...");
+                    const chunks = [];
+                    for await (const chunk of output) {
+                        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+                    }
+                    buffer = Buffer.concat(chunks);
+                } else if (Array.isArray(output) && output.length > 0) {
+                    // It's an Array (check if first element is string or buffer)
+                    const first = output[0];
+                    if (typeof first === 'string' && first.startsWith('http')) {
+                        finalAiImageUrl = first;
+                    } else {
+                        buffer = Buffer.from(first);
+                    }
+                } else if (output && typeof output === 'object') {
+                    // It's an Object (check common keys)
+                    const urlCandidate = output.url || output.output || output.image || (output.data ? output.data[0] : null);
+                    if (typeof urlCandidate === 'string' && urlCandidate.startsWith('http')) {
+                        finalAiImageUrl = urlCandidate;
+                    } else {
+                        // If it's an object, it might be the buffer itself (unlikely but safe)
+                        buffer = Buffer.from(Object.values(output)[0]);
+                    }
+                }
+
+                // If we have a buffer (Binary Data), upload it to Cloudinary
+                if (!finalAiImageUrl && buffer) {
+                    console.log("📤 [AI] Binary data detected. Uploading buffer to Cloudinary...");
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        cloudinary.uploader.upload_stream(
+                            { folder: "ai_studio_generated" }, 
+                            (error, result) => {
+                                if (error) reject(error); else resolve(result);
+                            }
+                        ).end(buffer);
+                    });
+                    finalAiImageUrl = uploadResult.secure_url;
+                }
             }
 
-            // Agar abhi bhi object hai, toh use string mein convert karo (safety net)
-            if (typeof finalAiImageUrl === 'object' && finalAiImageUrl !== null) {
-                finalAiImageUrl = JSON.stringify(finalAiImageUrl);
-            }
-
-            // Check if we actually got a valid string URL
+            // Final Check: Did we actually get a URL?
             if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
-                throw new Error("AI returned an invalid image URL. Try a different prompt.");
+                console.error("❌ [AI] Failed to extract URL. Raw Output:", JSON.stringify(output));
+                throw new Error("AI returned an invalid format. Please try a different prompt.");
             }
 
-            // Upload the generated image to Cloudinary so it's permanent
-            console.log("☁️ [PROMPT] Uploading generated image to Cloudinary...");
-            const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
-            finalAiImageUrl = uploadResult.secure_url;
+            // IMPORTANT: If it was a URL from Replicate, we must upload to Cloudinary 
+            // to make it permanent in our gallery.
+            if (!finalAiImageUrl.includes('cloudinary.com')) {
+                console.log("☁️ [PROMPT] Moving Replicate image to Cloudinary...");
+                const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
+                finalAiImageUrl = uploadResult.secure_url;
+            }
 
         } 
         // --- CASE B: FACE-SWAP MODE ---
@@ -221,12 +257,9 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
             finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
         } 
-        else {
-            throw new Error("Invalid mode! Use 'prompt' or 'faceswap'.");
-        }
 
-        // --- FINAL STEP: SAVE EVERYTHING ---
-        console.log("💾 [SAVE] Saving order and deducting credit...");
+        // --- FINAL STEP: SAVE TO DB ---
+        console.log("💾 [SAVE] Saving order...");
         user.credits -= 1;
         await user.save();
 
@@ -240,7 +273,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         });
 
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-        
         res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
 
     } catch (error) {
