@@ -244,21 +244,38 @@ window.currentMode = 'faceswap'; // Naya variable
             document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
             document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
         };
-         // Naya Mode Switcher Function
+         // 🚀 UPDATED Mode Switcher Function
 window.setMode = (mode) => {
     window.currentMode = mode;
     const promptContainer = document.getElementById('prompt-container');
     const modeFaceswapBtn = document.getElementById('mode-faceswap');
     const modePromptBtn = document.getElementById('mode-prompt');
+    
+    // In elements ko select karein jinhe hide/show karna hai
+    const imageInputArea = document.getElementById('preview-container'); 
+    // Note: Agar aapne 'Choose Image' button ko kisi div mein rakha hai, toh uska ID use karein.
+    // Filhal main direct imageInput aur button ko manage karne ka logic de raha hoon.
 
     if (mode === 'prompt') {
+        // Prompt Mode mein:
         promptContainer.classList.remove('hidden');
+        // Image wala part chhupa do
+        document.getElementById('imageInput').classList.add('hidden');
+        // Agar aapne button ko kisi wrapper mein rakha hai toh use bhi hide karein
+        // Filhal main button ko select karne ka logic de raha hoon
+        document.querySelector('button[onclick="document.getElementById(\'imageInput\').click()"]').classList.add('hidden');
+
         modePromptBtn.classList.replace('bg-slate-100', 'bg-indigo-600');
         modePromptBtn.classList.replace('text-slate-600', 'text-white');
         modeFaceswapBtn.classList.replace('bg-indigo-600', 'bg-slate-100');
         modeFaceswapBtn.classList.replace('text-white', 'text-slate-600');
     } else {
+        // Face-Swap Mode mein:
         promptContainer.classList.add('hidden');
+        // Image wala part dikhao
+        document.getElementById('imageInput').classList.remove('hidden');
+        document.querySelector('button[onclick="document.getElementById(\'imageInput\').click()"]').classList.remove('hidden');
+
         modeFaceswapBtn.classList.replace('bg-slate-100', 'bg-indigo-600');
         modeFaceswapBtn.classList.replace('text-slate-600', 'text-white');
         modePromptBtn.classList.replace('bg-indigo-600', 'bg-slate-100');
