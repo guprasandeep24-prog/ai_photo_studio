@@ -156,80 +156,99 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 UPDATED ROUTE 1: AI Generation (With Real Email)
-// 🚀 UPDATED ROUTE 1: Universal AI Generator (Face-Swap OR Prompt-to-Image)
+// 🚀 ULTIMATE UNIVERSAL GENERATOR ROUTE
 app.post('/upload', upload.single('image'), async (req, res) => {
-    console.log("📥 [GENERATE] Request received");
+    console.log("📥 [GENERATE] Request received for /upload");
+    console.log("📝 [DATA] Body:", req.body);
+    console.log("📁 [FILE] File info:", req.file ? req.file.path : "No file uploaded");
+
     let localFilePath = req.file ? req.file.path : null; 
 
     try {
-        // Frontend se saari details nikaalein
         const { category, gender, userId, prompt, mode } = req.body;
 
-        if (!userId) return res.status(400).json({ success: false, error: "User ID missing!" });
+        if (!userId) {
+            return res.status(400).json({ success: false, error: "User ID missing!" });
+        }
 
+        // 1. User Check
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found!" });
         if (user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
 
         let finalAiImageUrl = "";
 
-        // --- CASE A: PROMPT-TO-IMAGE MODE (Text to Image) ---
-        if (mode === 'prompt' && prompt) {
-            console.log("🎨 [MODE] Prompt-to-Image mode active. Prompt:", prompt);
+        // --- CASE A: MAGIC PROMPT MODE (Text-to-Image) ---
+        if (mode === 'prompt') {
+            if (!prompt) return res.status(400).json({ success: false, error: "Please provide a prompt!" });
             
-            // Using Flux-Schnell (Fastest and highest quality model on Replicate)
+            console.log("🎨 [MODE] Prompt-to-Image active. Prompt:", prompt);
+            
+            // Using Flux-Schnell (Fast & High Quality)
             const output = await replicate.run(
                 "black-forest-labs/flux-schnell",
                 { input: { prompt: prompt } }
             );
-            
-            finalAiImageUrl = Array.isArray(output) ? output[0] : output;
-            console.log("✅ [AI] Prompt-to-Image Success:", finalAiImageUrl);
+
+            // Handle different Replicate output formats (String, Array, or Object)
+            if (typeof output === 'string') {
+                finalAiImageUrl = output;
+            } else if (Array.isArray(output) && output.length > 0) {
+                finalAiImageUrl = output[0];
+            } else if (typeof output === 'object' && output !== null) {
+                finalAiImageUrl = output.output || output.url || output.image || (output.data ? output.data[0] : "");
+            }
+
+            if (!finalAiImageUrl || !finalAiImageUrl.startsWith('http')) {
+                throw new Error("AI returned an invalid image URL in prompt mode.");
+            }
+
+            // IMPORTANT: Prompt mode mein image Replicate ke server par hoti hai. 
+            // Use Cloudinary mein save karein taaki hum database mein link rakh sakein.
+            console.log("☁️ [PROMPT] Uploading generated image to Cloudinary...");
+            const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
+            finalAiImageUrl = uploadResult.secure_url;
 
         } 
-        // --- CASE B: FACE-SWAP MODE (Image to Image) ---
-        else if (mode === 'faceswap' && localFilePath) {
+        // --- CASE B: FACE-SWAP MODE (Image-to-Image) ---
+        else if (mode === 'faceswap') {
+            if (!localFilePath) return res.status(400).json({ success: false, error: "Please upload an image for face-swap!" });
+            if (!category || !gender) return res.status(400).json({ success: false, error: "Category or Gender missing!" });
+
             console.log("👤 [MODE] Face-swap mode active.");
-            
-            // 1. Upload user photo to Cloudinary
+
+            // 1. Upload user selfie to Cloudinary
             const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
             
             // 2. Run Face-swap logic
             finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
-            console.log("✅ [AI] Face-swap Success:", finalAiImageUrl);
         } 
         else {
-            throw new Error("Please provide either a prompt or an image!");
+            throw new Error("Invalid mode! Use 'prompt' or 'faceswap'.");
         }
 
-        // --- FINAL STEP: Save to Database & Cloudinary ---
-        
-        // Agar prompt mode hai, toh image ko Cloudinary mein save karna padega taaki hum database mein link rakh sakein
-        let permanentImageUrl = finalAiImageUrl;
-        if (mode === 'prompt') {
-            // Prompt mode mein image Replicate ke server par hoti hai, use Cloudinary mein copy karte hain
-            const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
-            permanentImageUrl = uploadResult.secure_url;
-        }
+        // --- FINAL STEP: SAVE EVERYTHING ---
+        if (!finalAiImageUrl) throw new Error("AI failed to generate a valid image URL.");
 
-        // 3. Deduct Credit & Save Order
+        // Deduct credit
         user.credits -= 1;
         await user.save();
 
+        // Save to Order collection
         await Order.create({ 
             userId, 
             category: mode === 'prompt' ? 'Magic Prompt' : category, 
             gender: mode === 'prompt' ? 'neutral' : gender, 
-            aiImageUrl: permanentImageUrl, 
+            aiImageUrl: finalAiImageUrl, 
             status: 'completed', 
             razorpayOrderId: 'N/A' 
         });
 
-        // Cleanup local file
+        // Cleanup local file if it exists
         if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
 
-        res.json({ success: true, ai_image_url: permanentImageUrl, remainingCredits: user.credits });
+        console.log("✅ [SUCCESS] Generation complete!");
+        res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
 
     } catch (error) {
         console.error("❌ [GENERATE ERROR]:", error);
