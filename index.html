@@ -123,7 +123,16 @@
     <section id="upload-section" class="hidden container mx-auto px-6 py-12">
         <div class="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border-2 border-dashed border-indigo-200 text-center">
             <button onclick="hideUploadSection()" class="float-right text-slate-400 hover:text-slate-600"><i class="fa-solid fa-arrow-left"></i> Back</button>
-            <h2 id="selected-cat-title" class="text-2xl font-bold mb-2 text-indigo-600 pt-4">Upload Photo</h2>
+            <h2 id="selected-cat-title" class="text-2xl font-bold mb-2 text-indigo-600 pt-4">Upload Photo</h2><!-- Naya Prompt Box aur Mode Switcher -->
+<div id="prompt-container" class="hidden mb-6 text-left">
+    <label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label>
+    <textarea id="promptInput" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="e.g. A futuristic astronaut riding a horse on Mars..."></textarea>
+</div>
+
+<div class="flex justify-center gap-4 mb-6">
+    <button id="mode-faceswap" onclick="setMode('faceswap')" class="text-xs font-bold px-4 py-2 rounded-full bg-indigo-600 text-white transition">Face-Swap Mode</button>
+    <button id="mode-prompt" onclick="setMode('prompt')" class="text-xs font-bold px-4 py-2 rounded-full bg-slate-100 text-slate-600 transition">Magic Prompt Mode</button>
+</div>
             <div class="mb-8"><p class="text-slate-500 text-sm mb-3">Select Gender</p><div class="flex justify-center gap-4"><button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Man</button><button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button></div></div>
             <input type="file" id="imageInput" class="hidden" accept="image/*">
             <div id="preview-container" class="hidden mb-6"><img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg"></div>
@@ -213,7 +222,15 @@
         const auth = getAuth(app);
         const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
-        window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.originalImageUrl = ""; window.isLoginMode = true;
+        // Purana: window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.isLoginMode = true;
+
+// Naya:
+window.selectedCategory = ""; 
+window.selectedGender = ""; 
+window.selectedFile = null; 
+window.originalImageUrl = ""; // Naya variable
+window.isLoginMode = true; 
+window.currentMode = 'faceswap'; // Naya variable
 
         // Auth & Nav Functions
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
@@ -227,7 +244,27 @@
             document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
             document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
         };
+         // Naya Mode Switcher Function
+window.setMode = (mode) => {
+    window.currentMode = mode;
+    const promptContainer = document.getElementById('prompt-container');
+    const modeFaceswapBtn = document.getElementById('mode-faceswap');
+    const modePromptBtn = document.getElementById('mode-prompt');
 
+    if (mode === 'prompt') {
+        promptContainer.classList.remove('hidden');
+        modePromptBtn.classList.replace('bg-slate-100', 'bg-indigo-600');
+        modePromptBtn.classList.replace('text-slate-600', 'text-white');
+        modeFaceswapBtn.classList.replace('bg-indigo-600', 'bg-slate-100');
+        modeFaceswapBtn.classList.replace('text-white', 'text-slate-600');
+    } else {
+        promptContainer.classList.add('hidden');
+        modeFaceswapBtn.classList.replace('bg-slate-100', 'bg-indigo-600');
+        modeFaceswapBtn.classList.replace('text-slate-600', 'text-white');
+        modePromptBtn.classList.replace('bg-indigo-600', 'bg-slate-100');
+        modePromptBtn.classList.replace('text-white', 'text-slate-600');
+    }
+};
         document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('authEmail').value;
@@ -351,49 +388,63 @@
         });
 
         document.getElementById('submitBtn').addEventListener('click', async function() {
-            const user = auth.currentUser;
-            if (!user) return alert("Please Login first!");
-            if (!window.selectedCategory) return alert("Please select a Category!");
-            if (!window.selectedGender) return alert("Please select Gender!");
-            if (!window.selectedFile) return alert("Please select an image!");
+    const user = auth.currentUser;
+    if (!user) return alert("Please Login first!");
 
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('email', user.email);
-            formData.append('category', window.selectedCategory);
-            formData.append('gender', window.selectedGender);
-            formData.append('image', window.selectedFile);
+    const formData = new FormData();
+    formData.append('userId', user.uid);
+    formData.append('email', user.email);
+    formData.append('mode', window.currentMode); // Mode bhej rahe hain
 
-            document.getElementById('loadingModal').classList.remove('hidden');
+    // Logic based on Mode
+    if (window.currentMode === 'faceswap') {
+        if (!window.selectedCategory) return alert("Please select a Category!");
+        if (!window.selectedGender) return alert("Please select Gender!");
+        if (!window.selectedFile) return alert("Please select an image!");
+        
+        formData.append('category', window.selectedCategory);
+        formData.append('gender', window.selectedGender);
+        formData.append('image', window.selectedFile);
+    } else {
+        const promptText = document.getElementById('promptInput').value;
+        if (!promptText) return alert("Please write a prompt!");
+        formData.append('prompt', promptText);
+    }
 
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = window.originalImageUrl; // Set for slider
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    // Initialize Slider Logic
-                    const slider = document.getElementById('comparisonSlider');
-                    const beforeWrapper = document.getElementById('beforeImageWrapper');
-                    const handle = document.getElementById('sliderHandle');
+    document.getElementById('loadingModal').classList.remove('hidden');
 
-                    slider.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        beforeWrapper.style.width = `${val}%`;
-                        handle.style.left = `${val}%`;
-                    });
-                } else {
-                    throw new Error(result.error || "AI Generation failed");
-                }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
+    try {
+        const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.success) {
+            document.getElementById('resultImage').src = result.ai_image_url;
+            // Slider ke liye original image set karein
+            if(window.originalImageUrl) {
+                document.getElementById('originalImagePreview').src = window.originalImageUrl;
             }
-        });
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+            
+            // Slider initialize karne ka logic
+            const slider = document.getElementById('comparisonSlider');
+            const beforeWrapper = document.getElementById('beforeImageWrapper');
+            const handle = document.getElementById('sliderHandle');
+            if(slider) {
+                slider.addEventListener('input', (e) => {
+                    const val = e.target.value;
+                    beforeWrapper.style.width = `${val}%`;
+                    handle.style.left = `${val}%`;
+                });
+            }
+        } else {
+            throw new Error(result.error || "AI Generation failed");
+        }
+    } catch (error) {
+        alert("❌ Error: " + error.message);
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+});
 
         // --- RAZORPAY INTEGRATION ---
         window.startPayment = async (amount, credits) => {
