@@ -29,11 +29,12 @@ router.post('/create-order', async (req, res) => {
     }
 });
 
-// 🚀 ROUTE 2: Verify Payment & Add Credits
+// 🚀 ROUTE 2: Verify Payment & Add Credits (With Auto-Registration)
 router.post('/verify-payment', async (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, creditsToAdd } = req.body;
+    // Humne yahan 'email' bhi mangwaya hai taaki naya user bana sakein
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, creditsToAdd, email } = req.body;
 
-    // Signature verification logic
+    // 1. Signature Verification (Security Check)
     const sign = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSign = crypto
         .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -42,17 +43,30 @@ router.post('/verify-payment', async (req, res) => {
 
     if (razorpay_signature === expectedSign) {
         try {
-            // ✅ Payment Successful! Update User Credits in MongoDB
-            const user = await User.findOne({ firebaseUid: userId });
-            if (!user) return res.status(404).json({ success: false, error: "User not found" });
+            // 2. Check if user exists in MongoDB
+            let user = await User.findOne({ firebaseUid: userId });
 
-            user.credits += parseInt(creditsToAdd);
-            await user.save();
+            if (!user) {
+                // ✨ SELF-HEALING: Agar user nahi milta, toh turant create kar do!
+                console.log(`🆕 [PAYMENT] User not found in DB. Auto-creating for UID: ${userId}`);
+                user = new User({
+                    firebaseUid: userId,
+                    email: email || "new-user@example.com", // Use email from frontend
+                    credits: parseInt(creditsToAdd)        // Initial credits
+                });
+                await user.save();
+                console.log("✅ [PAYMENT] New user created successfully during verification.");
+            } else {
+                // 3. Agar user pehle se hai, toh credits badha do
+                user.credits += parseInt(creditsToAdd);
+                await user.save();
+                console.log(`💰 [PAYMENT] Credits added to existing user: ${userId}`);
+            }
 
-            console.log(`💰 [PAYMENT] Success! Added ${creditsToAdd} credits to user: ${userId}`);
             res.json({ success: true, message: "Payment successful! Credits added." });
         } catch (error) {
-            res.status(500).json({ success: false, error: "Database error" });
+            console.error("❌ [PAYMENT] Database Error:", error);
+            res.status(500).json({ success: false, error: "Database update failed" });
         }
     } else {
         console.error("❌ [PAYMENT] Signature mismatch!");

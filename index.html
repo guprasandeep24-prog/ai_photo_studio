@@ -318,36 +318,45 @@
                 const data = await response.json();
                 if (!data.success) throw new Error(data.error);
 
-                const options = {
-                    key: "rzp_test_T0igS1UI99gp4v", // 👈 REPLACE THIS WITH YOUR ACTUAL KEY ID
-                    amount: amount * 100,
-                    currency: "INR",
-                    name: "AI Photo Studio",
-                    description: `${credits} AI Credits Plan`,
-                    order_id: data.order.id,
-                    handler: async function (res) {
-                        const verifyRes = await fetch(`${BASE_URL}/api/payments/verify-payment`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                razorpay_order_id: res.razorpay_order_id,
-                                razorpay_payment_id: res.razorpay_payment_id,
-                                razorpay_signature: res.razorpay_signature,
-                                userId: user.uid,
-                                creditsToAdd: credits
-                            })
-                        });
-                        const verifyData = await verifyRes.json();
-                        if (verifyData.success) {
-                            alert("🎉 Payment Successful! Credits added.");
-                            location.reload();
-                        } else {
-                            alert("❌ Verification failed: " + verifyData.error);
-                        }
-                    },
-                    prefill: { email: user.email },
-                    theme: { color: "#4f46e5" }
-                };
+                // ... (baaki code same rahega)
+
+        // 2. Razorpay Checkout open karein
+        const options = {
+            key: "rzp_test_T0igS1UI99gp4v", // 👈 Isse apni real key se badal dein
+            amount: amount * 100,
+            currency: "INR",
+            name: "AI Photo Studio",
+            description: `${credits} AI Credits Plan`,
+            order_id: data.order.id,
+            handler: async function (res) {
+                // 🚀 UPDATE: Ab hum email bhi bhej rahe hain verify karne ke liye
+                const verifyRes = await fetch(`${BASE_URL}/api/payments/verify-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        razorpay_order_id: res.razorpay_order_id,
+                        razorpay_payment_id: res.razorpay_payment_id,
+                        razorpay_signature: res.razorpay_signature,
+                        userId: user.uid,
+                        email: user.email, // <--- YE LINE ADD KAREIN (Most Important)
+                        creditsToAdd: credits
+                    })
+                });
+
+                const verifyData = await verifyRes.json();
+                if (verifyData.success) {
+                    alert("🎉 Payment Successful! Credits added.");
+                    location.reload(); 
+                } else {
+                    alert("❌ Verification failed: " + verifyData.error);
+                }
+            },
+            prefill: {
+                email: user.email
+            },
+            theme: { color: "#4f46e5" }
+        };
+
                 const rzp = new Razorpay(options);
                 rzp.open();
             } catch (error) {
