@@ -156,7 +156,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 THE "NO-FAIL" UNIVERSAL GENERATOR ROUTE
+// 🚀 THE "NUCLEAR OPTION" GENERATOR ROUTE (Final & Most Robust)
 app.post('/upload', upload.single('image'), async (req, res) => {
     console.log("📥 [GENERATE] Request received");
     let localFilePath = req.file ? req.file.path : null; 
@@ -171,7 +171,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         let finalAiImageUrl = "";
 
-        // --- CASE A: PROMPT-TO-IMAGE MODE (Text to Image) ---
+        // --- CASE A: PROMPT-TO-IMAGE MODE ---
         if (mode === 'prompt') {
             if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required!" });
             console.log("🎨 [MODE] Prompt-to-Image active. Prompt:", prompt);
@@ -184,29 +184,43 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
             console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
 
-            // 🚀 THE SMART URL EXTRACTOR (Fixes FileOutput Error)
-            if (typeof output === 'string' && output.startsWith('http')) {
-                // Case 1: Direct String URL
-                finalAiImageUrl = output;
-            } else if (Array.isArray(output) && output.length > 0) {
-                // Case 2: Array of strings or objects
-                const first = output[0];
-                finalAiImageUrl = (typeof first === 'object' && first.url) ? first.url : first;
-            } else if (output && typeof output === 'object') {
-                // Case 3: FileOutput Object (This is your error fix!)
-                // Replicate FileOutput objects usually have a .url property
-                finalAiImageUrl = output.url || output.output || output.image || "";
-            }
+            // 🚀 THE ULTIMATE DEEP SEARCH URL EXTRACTOR
+            const findUrlDeeply = (obj) => {
+                if (typeof obj === 'string' && obj.startsWith('http')) return obj;
+                if (Array.isArray(obj) && obj.length > 0) {
+                    return findUrlDeeply(obj[0]); // Check first element
+                }
+                if (obj && typeof obj === 'object') {
+                    // 1. Check common keys first (for speed)
+                    if (obj.url) return obj.url;
+                    if (obj.output) return obj.output;
+                    if (obj.image) return obj.image;
+                    
+                    // 2. Deep search: Check every single key in the object
+                    for (let key in obj) {
+                        if (typeof obj[key] === 'string' && obj[key].startsWith('http')) {
+                            return obj[key];
+                        }
+                        // If nested object, recurse
+                        if (typeof obj[key] === 'object' && obj[key] !== null) {
+                            const deepResult = findUrlDeeply(obj[key]);
+                            if (deepResult) return deepResult;
+                        }
+                    }
+                }
+                return null;
+            };
 
-            // Final Safety Check: Is it a valid string URL?
+            finalAiImageUrl = findUrlDeeply(output);
+
             if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
-                console.error("❌ [AI] Failed to extract URL. Output was:", JSON.stringify(output));
-                throw new Error("AI returned an invalid format. Please try a different prompt.");
+                console.error("❌ [AI] CRITICAL FAILURE: Could not find URL in output:", JSON.stringify(output));
+                throw new Error("AI returned an unreadable format. Please try a different prompt.");
             }
 
-            console.log("🔗 [AI] URL Extracted:", finalAiImageUrl);
+            console.log("🔗 [AI] URL Successfully Found:", finalAiImageUrl);
 
-            // Move to Cloudinary to make it permanent
+            // Upload to Cloudinary to make it permanent
             console.log("☁️ [PROMPT] Uploading to Cloudinary...");
             const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
             finalAiImageUrl = uploadResult.secure_url;
