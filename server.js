@@ -155,7 +155,75 @@ app.get('/user-profile/:userId', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+// 🚀 ROUTE: Upload & AI Generation
+app.post('/upload', upload.single('image'), async (req, res) => {
+    try {
+        const { userId, email, mode, category, gender, prompt } = req.body;
 
+        // 1. Check User & Credits
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+
+        let aiImageUrl = "";
+        let originalImageUrl = "";
+
+        // 2. Handle Modes
+        if (mode === 'faceswap') {
+            if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+
+            // Upload user selfie to Cloudinary first
+            const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream({ folder: "user_selfies" }, (err, res) => {
+                    if (err) reject(err); else resolve(res);
+                }).end(req.file.buffer || fs.createReadStream(req.file.path)); 
+                // Note: if using multer.diskStorage, use fs.createReadStream
+            });
+            
+            originalImageUrl = uploadResult.secure_url;
+
+            // Call AI Face Swap
+            aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
+
+        } else if (mode === 'prompt') {
+            // For Magic Prompt (Flux-Schnell)
+            const output = await replicate.run(
+                "black-forest-labs/flux-schnell",
+                { input: { prompt: prompt } }
+            );
+            aiImageUrl = Array.isArray(output) ? output[0] : output;
+        }
+
+        if (!aiImageUrl) throw new Error("AI failed to generate image");
+
+        // 3. Deduct Credits & Save Order
+        user.credits -= 1;
+        await user.save();
+
+        const newOrder = new Order({
+            userId: userId,
+            email: email,
+            category: category || 'magic-prompt',
+            aiImageUrl: aiImageUrl,
+            originalImageUrl: originalImageUrl,
+            status: 'completed'
+        });
+        await newOrder.save();
+
+        // 4. Cleanup: Delete local file from 'uploads' folder
+        if (req.file) fs.unlinkSync(req.file.path);
+
+        res.json({ 
+            success: true, 
+            ai_image_url: aiImageUrl, 
+            original_image_url: originalImageUrl 
+        });
+
+    } catch (error) {
+        console.error("❌ [UPLOAD ERROR]:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 // Gallery Route
 app.get('/my-photos', async (req, res) => {
     try {
