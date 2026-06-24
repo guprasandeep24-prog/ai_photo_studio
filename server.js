@@ -15,9 +15,9 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// --- 1. CORS CONFIGURATION ---
+// --- 1. MIDDLEWARE & CONFIG ---
 app.use(cors({
-    origin: process.env.CLIENT_URL || '*', // Use environment variable for production
+    origin: process.env.CLIENT_URL || '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -25,7 +25,7 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 2. DATABASE & AI INIT ---
+// --- 2. DATABASE & AI INITIALIZATION ---
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
@@ -38,7 +38,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// --- 3. STORAGE SETUP ---
+// --- 3. STORAGE SETUP (Multer Disk Storage) ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -58,7 +58,6 @@ const TEMPLATES = {
 // --- 4. AI CORE LOGIC (The Brain) ---
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-    
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
 
     try {
@@ -72,29 +71,20 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         );
 
-        // Strategy 1: Direct String
+        // Strategy handling
         if (typeof output === 'string' && output.startsWith('http')) return output;
-
-        // Strategy 2: Array
         if (Array.isArray(output) && output[0]?.startsWith('http')) return output[0];
-
-        // Strategy 3: Object
         if (output && typeof output === 'object') {
             const url = output.output || output.url || output.image;
             if (typeof url === 'string' && url.startsWith('http')) return url;
         }
-
-        // Strategy 4: Stream/Buffer handling
+        // Stream handling
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
             const chunks = [];
-            for await (const chunk of output) {
-                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-            }
+            for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
             const buffer = Buffer.concat(chunks);
             const contentString = buffer.toString().trim();
-
             if (contentString.startsWith('http')) return contentString;
-
             if (buffer.length > 0) {
                 const uploadResult = await new Promise((resolve, reject) => {
                     cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
@@ -104,8 +94,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
                 return uploadResult.secure_url;
             }
         }
-
-        throw new Error("AI failed to return a valid image URL.");
+        throw new Error("AI returned unparseable format.");
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
@@ -113,40 +102,32 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 }
 
 // --- 5. ROUTES ---
-// 🚀 ROUTE: Register User (Auto-create MongoDB profile)
+
+// Health Check
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
+
+// Auth: Register/Login
 app.post('/register', async (req, res) => {
     try {
         const { email, firebaseUid } = req.body;
         let user = await User.findOne({ firebaseUid });
-
         if (!user) {
-            user = new User({
-                firebaseUid: firebaseUid,
-                email: email,
-                credits: 5 // Welcome credits!
-            });
+            user = new User({ firebaseUid, email, credits: 5 });
             await user.save();
             console.log(`🆕 [NEW USER] Registered: ${email}`);
         }
-        res.json({ success: true, message: "User registered/logged in" });
+        res.json({ success: true, message: "User ready" });
     } catch (error) {
-        console.error("❌ [REGISTER ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
-
-app.use('/api/payments', paymentRoutes);
-
-// Profile Route (Auto-Registration)
+// Profile
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         let user = await User.findOne({ firebaseUid: userId });
-
         if (!user) {
-            console.log(`🆕 [NEW USER] Auto-creating: ${userId}`);
             user = new User({ firebaseUid: userId, email: "new-user@example.com", credits: 5 });
             await user.save();
         }
@@ -155,12 +136,13 @@ app.get('/user-profile/:userId', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// 🚀 ROUTE: Upload & AI Generation
+
+// AI Generation (The Engine)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, mode, category, gender, prompt } = req.body;
 
-        // 1. Check User & Credits
+        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
@@ -168,83 +150,60 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         let aiImageUrl = "";
         let originalImageUrl = "";
 
-        // 2. Handle Modes
+        // 2. Execution
         if (mode === 'faceswap') {
             if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
 
-            // Upload user selfie to Cloudinary first
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder: "user_selfies" }, (err, res) => {
-                    if (err) reject(err); else resolve(res);
-                }).end(req.file.buffer || fs.createReadStream(req.file.path)); 
-                // Note: if using multer.diskStorage, use fs.createReadStream
-            });
-            
+            // FIXED: Since using diskStorage, use cloudinary.uploader.upload(path)
+            const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
             originalImageUrl = uploadResult.secure_url;
-
-            // Call AI Face Swap
             aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
 
         } else if (mode === 'prompt') {
-            // For Magic Prompt (Flux-Schnell)
-            const output = await replicate.run(
-                "black-forest-labs/flux-schnell",
-                { input: { prompt: prompt } }
-            );
+            const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt: prompt } });
             aiImageUrl = Array.isArray(output) ? output[0] : output;
         }
 
-        if (!aiImageUrl) throw new Error("AI failed to generate image");
+        if (!aiImageUrl) throw new Error("AI Generation failed");
 
-        // 3. Deduct Credits & Save Order
+        // 3. Database Update
         user.credits -= 1;
         await user.save();
 
         const newOrder = new Order({
-            userId: userId,
-            email: email,
-            category: category || 'magic-prompt',
-            aiImageUrl: aiImageUrl,
-            originalImageUrl: originalImageUrl,
-            status: 'completed'
+            userId, email, category: category || 'magic-prompt',
+            aiImageUrl, originalImageUrl, status: 'completed'
         });
         await newOrder.save();
 
-        // 4. Cleanup: Delete local file from 'uploads' folder
+        // 4. Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
 
-        res.json({ 
-            success: true, 
-            ai_image_url: aiImageUrl, 
-            original_image_url: originalImageUrl 
-        });
+        res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
 
     } catch (error) {
         console.error("❌ [UPLOAD ERROR]:", error);
+        // Cleanup local file even if error occurs to prevent disk full
+        if (req.file) fs.unlinkSync(req.file.path);
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// Gallery Route
+
+// Gallery
 app.get('/my-photos', async (req, res) => {
     try {
         const { userId } = req.query;
         if (!userId) return res.status(400).json({ success: false, error: "userId required" });
-
-        let user = await User.findOne({ firebaseUid: userId });
-        if (!user) {
-            user = new User({ firebaseUid: userId, email: "new-user@example.com", credits: 5 });
-            await user.save();
-        }
-
-        const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
+        const photos = await Order.find({ userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// --- 6. SERVER START ---
+// Payments
+app.use('/api/payments', paymentRoutes);
+
+// --- 6. START SERVER ---
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`));
