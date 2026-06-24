@@ -291,28 +291,49 @@
 
             document.getElementById('loadingModal').classList.remove('hidden');
 
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = result.original_image_url;
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    const slider = document.getElementById('comparisonSlider');
-                    const beforeWrapper = document.getElementById('beforeImageWrapper');
-                    const handle = document.getElementById('sliderHandle');
-                    slider.oninput = (e) => {
-                        const val = e.target.value;
-                        beforeWrapper.style.width = `${val}%`;
-                        handle.style.left = `${val}%`;
-                    };
-                } else {
-                    throw new Error(result.error || "AI Generation failed");
-                }
-            } catch (error) {
+            // index.html ke andar submitBtn click handler mein:
+
+try {
+    const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+    const result = await response.json();
+    
+    if (result.success) {
+        document.getElementById('resultImage').src = result.ai_image_url;
+        
+        // 🚀 FIX: Slider logic for Magic Prompt vs Face-Swap
+        const beforeWrapper = document.getElementById('beforeImageWrapper');
+        const slider = document.getElementById('comparisonSlider');
+        const handle = document.getElementById('sliderHandle');
+
+        if (window.currentMode === 'prompt' || !result.original_image_url) {
+            // Magic Prompt mode mein slider chhupa do
+            beforeWrapper.classList.add('hidden');
+            slider.classList.add('hidden');
+            handle.classList.add('hidden');
+        } else {
+            // Face-swap mode mein slider dikhao
+            beforeWrapper.classList.remove('hidden');
+            slider.classList.remove('hidden');
+            handle.classList.remove('hidden');
+            document.getElementById('originalImagePreview').src = result.original_image_url;
+            
+            // Slider initialize
+            slider.oninput = (e) => {
+                const val = e.target.value;
+                beforeWrapper.style.width = `${val}%`;
+                handle.style.left = `${val}%`;
+            };
+        }
+
+        document.getElementById('downloadBtn').href = result.ai_image_url;
+        document.getElementById('successModal').classList.remove('hidden');
+        document.getElementById('loadingModal').classList.add('hidden');
+    } else {
+        throw new Error(result.error || "AI Generation failed");
+    }
+} catch (error) {
+    // ... error handling
+} {
                 alert("❌ Error: " + error.message);
                 document.getElementById('loadingModal').classList.add('hidden');
             }
