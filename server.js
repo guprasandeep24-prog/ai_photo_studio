@@ -8,33 +8,24 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
 
+// Models & Routes
 const Order = require('./models/Order');
 const User = require('./models/User'); 
 const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// --- 1. IMPROVED CORS ---
-// Replace 'https://your-username.github.io' with your actual GitHub Pages URL
+// --- 1. CORS CONFIGURATION ---
 app.use(cors({
-    origin: '*', // Temporary: Sabko allow karo testing ke liye. Baad mein apna URL daal dena.
+    origin: process.env.CLIENT_URL || '*', // Use environment variable for production
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
-
-// Static folders
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 2. HEALTH CHECK ROUTE (Very Important for Testing) ---
-app.get('/', (req, res) => {
-    res.send("🚀 AI Photo Studio Backend is LIVE and running!");
-});
-
-// 3. Initialization
-console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
-
+// --- 2. DATABASE & AI INIT ---
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
@@ -47,6 +38,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// --- 3. STORAGE SETUP ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -63,13 +55,11 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🚀 THE "BRUTE FORCE" STREAM-PROOF AI LOGIC
+// --- 4. AI CORE LOGIC (The Brain) ---
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
-    console.log("🖼️ [AI] Target:", targetImageUrl);
-    console.log("👤 [AI] Swap with:", userCloudinaryUrl);
 
     try {
         const output = await replicate.run(
@@ -82,189 +72,89 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         );
 
-        console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
-        console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output).substring(0, 200)); // Log first 200 chars
+        // Strategy 1: Direct String
+        if (typeof output === 'string' && output.startsWith('http')) return output;
 
-        // --- STRATEGY 1: Direct String (The easiest) ---
-        if (typeof output === 'string' && output.startsWith('http')) {
-            console.log("✅ [AI] Strategy 1 Success: Found direct URL string.");
-            return output;
+        // Strategy 2: Array
+        if (Array.isArray(output) && output[0]?.startsWith('http')) return output[0];
+
+        // Strategy 3: Object
+        if (output && typeof output === 'object') {
+            const url = output.output || output.url || output.image;
+            if (typeof url === 'string' && url.startsWith('http')) return url;
         }
 
-        // --- STRATEGY 2: Array (Common) ---
-        if (Array.isArray(output) && output.length > 0) {
-            if (typeof output[0] === 'string' && output[0].startsWith('http')) {
-                console.log("✅ [AI] Strategy 2 Success: Found URL in array.");
-                return output[0];
-            }
-        }
-
-        // --- STRATEGY 3: Object with keys (Common) ---
-        if (output && typeof output === 'object' && !Array.isArray(output)) {
-            const urlFromObj = output.output || output.url || output.image || (output.data ? output.data[0] : null);
-            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) {
-                console.log("✅ [AI] Strategy 3 Success: Found URL inside object.");
-                return urlFromObj;
-            }
-        }
-
-        // --- STRATEGY 4: The "Heavy Lifting" (Handling the Stream/ReadableStream) ---
-        // We try to consume it as an async iterator (works for most streams)
-        try {
-            console.log("🌊 [AI] Strategy 4: Attempting to consume output as a Stream...");
+        // Strategy 4: Stream/Buffer handling
+        if (output && typeof output[Symbol.asyncIterator] === 'function') {
             const chunks = [];
-            
-            // This works if it's a Web Stream or Node Stream
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
             }
-
             const buffer = Buffer.concat(chunks);
             const contentString = buffer.toString().trim();
 
-            // Check if the stream was actually just a string URL
-            if (contentString.startsWith('http')) {
-                console.log("✅ [AI] Strategy 4 Success: Stream was actually a URL string.");
-                return contentString;
-            }
+            if (contentString.startsWith('http')) return contentString;
 
-            // If it's actual image bytes, upload to Cloudinary
             if (buffer.length > 0) {
-                console.log(`📤 [AI] Strategy 4 Success: Stream was image data (${buffer.length} bytes). Uploading...`);
                 const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_stream(
-                        { folder: "ai_studio_final" }, 
-                        (error, result) => {
-                            if (error) reject(error); else resolve(result);
-                        }
-                    ).end(buffer);
+                    cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
+                        if (err) reject(err); else resolve(res);
+                    }).end(buffer);
                 });
                 return uploadResult.secure_url;
             }
-        } catch (streamError) {
-            console.error("❌ [AI] Strategy 4 (Stream) failed:", streamError.message);
         }
 
-        // If all strategies fail
-        throw new Error(`AI returned unparseable format: ${JSON.stringify(output).substring(0, 100)}`);
-
+        throw new Error("AI failed to return a valid image URL.");
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
     }
 }
 
-// --- 4. ROUTES ---
+// --- 5. ROUTES ---
 
-// 🔍 REPLACING THE ENTIRE EXTRACTION LOGIC WITH A "DEBUG-FIRST" APPROACH
-console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
-console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 
-let finalAiImageUrl = "";
-
-// 1. Try direct string
-if (typeof output === 'string' && output.startsWith('http')) {
-    finalAiImageUrl = output;
-} 
-// 2. Try Array
-else if (Array.isArray(output) && output.length > 0) {
-    console.log("🔍 [DEBUG] Array detected. Checking elements...");
-    // Check if it's an array of strings or objects
-    const first = output[0];
-    if (typeof first === 'string' && first.startsWith('http')) {
-        finalAiImageUrl = first;
-    } else if (first && typeof first === 'object') {
-        // Try to find URL in the object
-        finalAiImageUrl = first.url || first.output || first.image || "";
-    }
-} 
-// 3. Try Object
-else if (output && typeof output === 'object') {
-    console.log("🔍 [DEBUG] Object detected. Checking keys...");
-    finalAiImageUrl = output.url || output.output || output.image || "";
-}
-
-// 🚀 THE "LAST RESORT" (If output is a Stream/Buffer)
-if (!finalAiImageUrl && output && typeof output[Symbol.asyncIterator] === 'function') {
-    console.log("🌊 [DEBUG] Stream detected. Consuming...");
-    const chunks = [];
-    for await (const chunk of output) {
-        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-    const str = buffer.toString().trim();
-    
-    if (str.startsWith('http')) {
-        finalAiImageUrl = str;
-    } else if (buffer.length > 0) {
-        console.log("📤 [DEBUG] Found binary data. Uploading...");
-        const uploadResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
-                if (err) reject(err); else resolve(res.secure_url);
-            }).end(buffer);
-        });
-        finalAiImageUrl = uploadResult;
-    }
-}
-
-// FINAL CHECK
-if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
-    // YAHAN PAR HUM ERROR KO "SMART" BANAYENGE
-    console.error("❌ [CRITICAL] Final URL is still empty! Output was:", JSON.stringify(output));
-    throw new Error("AI failed to generate an image. It might be due to a blocked prompt or model error. Please try a different prompt.");
-}
 app.use('/api/payments', paymentRoutes);
 
-// 🚀 IMPROVED ROUTE 3: Profile (With Auto-Registration)
-// 🚀 ROUTE 3: Profile (With Auto-Registration)
+// Profile Route (Auto-Registration)
 app.get('/user-profile/:userId', async (req, res) => {
     try {
-        const userId = req.params.userId;
+        const { userId } = req.params;
         let user = await User.findOne({ firebaseUid: userId });
 
         if (!user) {
-            console.log(`🆕 [NEW USER] Auto-creating user for UID: ${userId}`);
-            user = new User({
-                firebaseUid: userId,
-                email: "new-user@example.com", // Default
-                credits: 5 // Welcome credits!
-            });
+            console.log(`🆕 [NEW USER] Auto-creating: ${userId}`);
+            user = new User({ firebaseUid: userId, email: "new-user@example.com", credits: 5 });
             await user.save();
         }
-
         res.json({ success: true, credits: user.credits, email: user.email });
     } catch (error) {
-        console.error("❌ [PROFILE ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 🚀 ROUTE 4: Gallery (With Auto-Registration to prevent 404)
+// Gallery Route
 app.get('/my-photos', async (req, res) => {
     try {
         const { userId } = req.query;
         if (!userId) return res.status(400).json({ success: false, error: "userId required" });
 
-        // Check if user exists, if not, create them silently
         let user = await User.findOne({ firebaseUid: userId });
         if (!user) {
-            console.log(`🆕 [NEW USER] Auto-creating user during gallery fetch: ${userId}`);
-            user = new User({
-                firebaseUid: userId,
-                email: "new-user@example.com",
-                credits: 5
-            });
+            user = new User({ firebaseUid: userId, email: "new-user@example.com", credits: 5 });
             await user.save();
         }
 
         const photos = await Order.find({ userId: userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
     } catch (error) {
-        console.error("❌ [GALLERY ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
+// --- 6. SERVER START ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`);
