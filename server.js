@@ -138,7 +138,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             aiImageUrl, originalImageUrl, status: 'completed'
         });
         await newOrder.save();
-
+        
         if (req.file) fs.unlinkSync(req.file.path);
         res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
 
