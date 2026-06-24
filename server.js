@@ -156,136 +156,63 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 THE "UNSTOPPABLE" GENERATOR ROUTE (The Final Version)
-app.post('/upload', upload.single('image'), async (req, res) => {
-    console.log("📥 [GENERATE] Request received");
-    let localFilePath = req.file ? req.file.path : null; 
+// 🔍 REPLACING THE ENTIRE EXTRACTION LOGIC WITH A "DEBUG-FIRST" APPROACH
+console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
+console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
 
-    try {
-        const { category, gender, userId, prompt, mode } = req.body;
-        if (!userId) return res.status(400).json({ success: false, error: "User ID missing!" });
+let finalAiImageUrl = "";
 
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user) return res.status(404).json({ success: false, error: "User not found!" });
-        if (user.credits < 1) return res.status(402).json({ success: false, error: "Insufficient credits!" });
-
-        let finalAiImageUrl = "";
-
-        if (mode === 'prompt') {
-            if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required!" });
-            console.log("🎨 [MODE] Prompt-to-Image active. Prompt:", prompt);
-
-            const output = await replicate.run(
-                "black-forest-labs/flux-schnell",
-                { input: { prompt: prompt } }
-            );
-
-            console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
-            console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
-
-            // 🚀 THE "UNSTOPPABLE" DATA EXTRACTOR
-            // 1. Try direct string URL
-            if (typeof output === 'string' && output.startsWith('http')) {
-                finalAiImageUrl = output;
-            } 
-            // 2. Try Array handling
-            else if (Array.isArray(output) && output.length > 0) {
-                const first = output[0];
-                if (typeof first === 'string' && first.startsWith('http')) {
-                    finalAiImageUrl = first;
-                } else if (first && typeof first === 'object' && first.url) {
-                    finalAiImageUrl = first.url;
-                } else {
-                    // If it'                    // (Deep Binary/Stream Handling)
-                    console.log("🌊 [AI] Array contains Stream/Buffer. Consuming...");
-                    const chunks = [];
-                    // Check if the first element is an async iterator (stream)
-                    const streamSource = (typeof first[Symbol.asyncIterator] === 'function') ? first : (typeof first[Symbol.iterator] === 'function' ? first : null);
-                    
-                    if (streamSource) {
-                        for await (const chunk of streamSource) {
-                            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-                        }
-                        const buffer = Buffer.concat(chunks);
-                        if (buffer.length > 0) {
-                            console.log("📤 [AI] Binary data found in Array. Uploading...");
-                            const uploadResult = await new Promise((resolve, reject) => {
-                                cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
-                                    if (err) reject(err); else resolve(res.secure_url);
-                                });
-                            }).end(buffer);
-                            finalAiImageUrl = uploadResult;
-                        }
-                    }
-                }
-            } 
-            // 3. Try Object handling
-            else if (output && typeof output === 'object') {
-                if (output.url) finalAiImageUrl = output.url;
-                else if (output.output) finalAiImageUrl = output.output;
-                else if (output.image) finalAiImageUrl = output.image;
-                // If it's a stream object
-                else if (typeof output[Symbol.asyncIterator] === 'function') {
-                    console.log("🌊 [AI] Object is a Stream. Consuming...");
-                    const chunks = [];
-                    for await (const chunk of output) {
-                        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-                    }
-                    const buffer = Buffer.concat(chunks);
-                    const uploadResult = await new Promise((resolve, reject) => {
-                        cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
-                            if (err) reject(err); else resolve(res.secure_url);
-                        });
-                    }).end(buffer);
-                    finalAiImageUrl = uploadResult;
-                }
-            }
-
-            // Final Validation
-            if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
-                throw new Error("AI returned an unreadable format. Please try a different prompt.");
-            }
-
-            console.log("🔗 [AI] URL Successfully Found:", finalAiImageUrl);
-
-            // Move to Cloudinary
-            if (!finalAiImageUrl.includes('cloudinary.com')) {
-                console.log("☁️ [PROMPT] Moving Replicate image to Cloudinary...");
-                const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
-                finalAiImageUrl = uploadResult.secure_url;
-            }
-
-        } else if (mode === 'faceswap') {
-            if (!localFilePath) return res.status(400).json({ success: false, error: "Please upload an image!" });
-            if (!category || !gender) return res.status(400).json({ success: false, error: "Category or Gender missing!" });
-            console.log("👤 [MODE] Face-swap mode active.");
-            const cloudinaryResult = await cloudinary.uploader.upload(localFilePath, { folder: 'ai_studio_uploads' });
-            finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
-        } 
-
-        // --- FINAL STEP: SAVE TO DB ---
-        console.log("💾 [SAVE] Saving order...");
-        user.credits -= 1;
-        await user.save();
-
-        await Order.create({ 
-            userId, 
-            category: mode === 'prompt' ? 'Magic Prompt' : category, 
-            gender: mode === 'prompt' ? 'neutral' : gender, 
-            aiImageUrl: finalAiImageUrl, 
-            status: 'completed', 
-            razorpayOrderId: 'N/A' 
-        });
-
-        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-        res.json({ success: true, ai_image_url: finalAiImageUrl, remainingCredits: user.credits });
-
-    } catch (error) {
-        console.error("❌ [GENERATE ERROR]:", error);
-        if (localFilePath && fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-        res.status(500).json({ success: false, error: error.message });
+// 1. Try direct string
+if (typeof output === 'string' && output.startsWith('http')) {
+    finalAiImageUrl = output;
+} 
+// 2. Try Array
+else if (Array.isArray(output) && output.length > 0) {
+    console.log("🔍 [DEBUG] Array detected. Checking elements...");
+    // Check if it's an array of strings or objects
+    const first = output[0];
+    if (typeof first === 'string' && first.startsWith('http')) {
+        finalAiImageUrl = first;
+    } else if (first && typeof first === 'object') {
+        // Try to find URL in the object
+        finalAiImageUrl = first.url || first.output || first.image || "";
     }
-});
+} 
+// 3. Try Object
+else if (output && typeof output === 'object') {
+    console.log("🔍 [DEBUG] Object detected. Checking keys...");
+    finalAiImageUrl = output.url || output.output || output.image || "";
+}
+
+// 🚀 THE "LAST RESORT" (If output is a Stream/Buffer)
+if (!finalAiImageUrl && output && typeof output[Symbol.asyncIterator] === 'function') {
+    console.log("🌊 [DEBUG] Stream detected. Consuming...");
+    const chunks = [];
+    for await (const chunk of output) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    const str = buffer.toString().trim();
+    
+    if (str.startsWith('http')) {
+        finalAiImageUrl = str;
+    } else if (buffer.length > 0) {
+        console.log("📤 [DEBUG] Found binary data. Uploading...");
+        const uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
+                if (err) reject(err); else resolve(res.secure_url);
+            }).end(buffer);
+        });
+        finalAiImageUrl = uploadResult;
+    }
+}
+
+// FINAL CHECK
+if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
+    // YAHAN PAR HUM ERROR KO "SMART" BANAYENGE
+    console.error("❌ [CRITICAL] Final URL is still empty! Output was:", JSON.stringify(output));
+    throw new Error("AI failed to generate an image. It might be due to a blocked prompt or model error. Please try a different prompt.");
+}
 app.use('/api/payments', paymentRoutes);
 
 // 🚀 IMPROVED ROUTE 3: Profile (With Auto-Registration)
