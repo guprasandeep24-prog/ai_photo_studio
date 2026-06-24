@@ -113,6 +113,27 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 }
 
 // --- 5. ROUTES ---
+// 🚀 ROUTE: Register User (Auto-create MongoDB profile)
+app.post('/register', async (req, res) => {
+    try {
+        const { email, firebaseUid } = req.body;
+        let user = await User.findOne({ firebaseUid });
+
+        if (!user) {
+            user = new User({
+                firebaseUid: firebaseUid,
+                email: email,
+                credits: 5 // Welcome credits!
+            });
+            await user.save();
+            console.log(`🆕 [NEW USER] Registered: ${email}`);
+        }
+        res.json({ success: true, message: "User registered/logged in" });
+    } catch (error) {
+        console.error("❌ [REGISTER ERROR]:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 
