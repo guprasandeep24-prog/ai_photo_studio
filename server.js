@@ -156,9 +156,7 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// ===========================================================
-// START OF NEW CODE (Replace the old /upload route with this)
-// ===========================================================
+// 🚀 THE "UNSTOPPABLE" GENERATOR ROUTE (The Final Version)
 app.post('/upload', upload.single('image'), async (req, res) => {
     console.log("📥 [GENERATE] Request received");
     let localFilePath = req.file ? req.file.path : null; 
@@ -183,34 +181,74 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             );
 
             console.log("📦 [AI] RAW OUTPUT TYPE:", typeof output);
+            console.log("📦 [AI] RAW OUTPUT CONTENT:", JSON.stringify(output));
 
-            const findUrlDeeply = (obj) => {
-                if (typeof obj === 'string' && obj.startsWith('http')) return obj;
-                if (Array.isArray(obj) && obj.length > 0) return findUrlDeeply(obj[0]);
-                if (obj && typeof obj === 'object') {
-                    if (obj.url) return obj.url;
-                    if (obj.output) return obj.output;
-                    if (obj.image) return obj.image;
-                    for (let key in obj) {
-                        if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
-                        if (typeof obj[key] === 'object' && obj[key] !== null) {
-                            const deepResult = findUrlDeeply(obj[key]);
-                            if (deepResult) return deepResult;
+            // 🚀 THE "UNSTOPPABLE" DATA EXTRACTOR
+            // 1. Try direct string URL
+            if (typeof output === 'string' && output.startsWith('http')) {
+                finalAiImageUrl = output;
+            } 
+            // 2. Try Array handling
+            else if (Array.isArray(output) && output.length > 0) {
+                const first = output[0];
+                if (typeof first === 'string' && first.startsWith('http')) {
+                    finalAiImageUrl = first;
+                } else if (first && typeof first === 'object' && first.url) {
+                    finalAiImageUrl = first.url;
+                } else {
+                    // If it'                    // (Deep Binary/Stream Handling)
+                    console.log("🌊 [AI] Array contains Stream/Buffer. Consuming...");
+                    const chunks = [];
+                    // Check if the first element is an async iterator (stream)
+                    const streamSource = (typeof first[Symbol.asyncIterator] === 'function') ? first : (typeof first[Symbol.iterator] === 'function' ? first : null);
+                    
+                    if (streamSource) {
+                        for await (const chunk of streamSource) {
+                            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+                        }
+                        const buffer = Buffer.concat(chunks);
+                        if (buffer.length > 0) {
+                            console.log("📤 [AI] Binary data found in Array. Uploading...");
+                            const uploadResult = await new Promise((resolve, reject) => {
+                                cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
+                                    if (err) reject(err); else resolve(res.secure_url);
+                                });
+                            }).end(buffer);
+                            finalAiImageUrl = uploadResult;
                         }
                     }
                 }
-                return null;
-            };
+            } 
+            // 3. Try Object handling
+            else if (output && typeof output === 'object') {
+                if (output.url) finalAiImageUrl = output.url;
+                else if (output.output) finalAiImageUrl = output.output;
+                else if (output.image) finalAiImageUrl = output.image;
+                // If it's a stream object
+                else if (typeof output[Symbol.asyncIterator] === 'function') {
+                    console.log("🌊 [AI] Object is a Stream. Consuming...");
+                    const chunks = [];
+                    for await (const chunk of output) {
+                        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+                    }
+                    const buffer = Buffer.concat(chunks);
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (err, res) => {
+                            if (err) reject(err); else resolve(res.secure_url);
+                        });
+                    }).end(buffer);
+                    finalAiImageUrl = uploadResult;
+                }
+            }
 
-            finalAiImageUrl = findUrlDeeply(output);
-
+            // Final Validation
             if (!finalAiImageUrl || typeof finalAiImageUrl !== 'string' || !finalAiImageUrl.startsWith('http')) {
-                console.error("❌ [AI] CRITICAL FAILURE: Could not extract URL. Raw Output:", JSON.stringify(output));
                 throw new Error("AI returned an unreadable format. Please try a different prompt.");
             }
 
             console.log("🔗 [AI] URL Successfully Found:", finalAiImageUrl);
 
+            // Move to Cloudinary
             if (!finalAiImageUrl.includes('cloudinary.com')) {
                 console.log("☁️ [PROMPT] Moving Replicate image to Cloudinary...");
                 const uploadResult = await cloudinary.uploader.upload(finalAiImageUrl, { folder: "ai_studio_generated" });
@@ -225,9 +263,10 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             finalAiImageUrl = await runAIFaceSwap(cloudinaryResult.secure_url, category, gender);
         } 
 
+        // --- FINAL STEP: SAVE TO DB ---
         console.log("💾 [SAVE] Saving order...");
         user.credits -= 1;
-        await user.save(); 
+        await user.save();
 
         await Order.create({ 
             userId, 
@@ -247,9 +286,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// ===========================================================
-// END OF NEW CODE
-// ===========================================================
 app.use('/api/payments', paymentRoutes);
 
 // 🚀 IMPROVED ROUTE 3: Profile (With Auto-Registration)
