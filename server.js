@@ -150,11 +150,18 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         user.credits -= 1;
         await user.save();
 
-        const newOrder = new Order({
-            userId, email, category: category || 'magic-prompt',
-            gender: mode === 'faceswap' ? gender : undefined, // 👈 Fix for gender validation error
-            aiImageUrl, originalImageUrl, status: 'completed'
-        });
+        // server.js ke andar /upload route mein:
+
+const newOrder = new Order({
+    userId: userId,
+    email: email,
+    category: category || 'magic-prompt',
+    // 🚀 Agar faceswap hai toh gender bhejega, warna undefined (jo ki ab allowed hai)
+    gender: mode === 'faceswap' ? gender : undefined, 
+    aiImageUrl: aiImageUrl,
+    originalImageUrl: originalImageUrl,
+    status: 'completed'
+});
         await newOrder.save();
 
         if (req.file) fs.unlinkSync(req.file.path);
