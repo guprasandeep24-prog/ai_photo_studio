@@ -51,122 +51,148 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-function extractUrl(output) {
-    if (!output) return "";
-    if (typeof output === 'string') return output.startsWith('http') ? output : "";
-    if (Array.isArray(output) && output.length > 0) return extractUrl(output[0]);
-    if (typeof output === 'object') {
-        const keys = ['url', 'output', 'image', 'secure_url'];
-        for (let key of keys) {
-            if (output[key] && typeof output[key] === 'string' && output[key].startsWith('http')) return output[key];
+// --- AI CORE LOGIC (Your Original Strategies) ---
+async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
+    const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
+    console.log("🤖 [AI] Starting Replicate Face-Swap...");
+
+    try {
+        const output = await replicate.run(
+            "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
+            { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
+        );
+
+        if (typeof output === 'string' && output.startsWith('http')) return output;
+        if (Array.isArray(output) && output.length > 0) return output[0];
+        if (output && typeof output === 'object') {
+            const urlFromObj = output.output || output.url || output.image;
+            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
         }
+        // Strategy 4: Stream handling
+        if (output && typeof output[Symbol.asyncIterator] === 'function') {
+            const chunks = [];
+            for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
+            const buffer = Buffer.concat(chunks);
+            const contentString = buffer.toString().trim();
+            if (contentString.startsWith('http')) return contentString;
+            if (buffer.length > 0) {
+                const uploadResult = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
+                        if (error) reject(error); else resolve(result);
+                    }).end(buffer);
+                });
+                return uploadResult.secure_url;
+            }
+        }
+        throw new Error("AI returned unparseable format");
+    } catch (error) {
+        console.error("❌ [AI ERROR]:", error.message);
+        throw error;
     }
-    return "";
 }
 
 // --- ROUTES ---
 
-app.get('/', (req, res) => res.send("🚀 Backend Live"));
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 
-// 🚀 ROUTE 1: FACE-SWAP (Uses Multer for File + Text)
-app.post('/api/upload-faceswap', upload.single('image'), async (req, res) => {
-    try {
-        const { userId, email, category, gender } = req.body;
-        console.log("🔄 Face-Swap Request received for:", email);
-
-        if (!userId || !req.file) return res.status(400).json({ success: false, error: "Missing UserID or Image" });
-
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "No credits!" });
-
-        const uploadRes = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
-        const originalImageUrl = uploadRes.secure_url;
-
-        const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-        const output = await replicate.run(
-            "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
-            { input: { target_image: targetImageUrl, swap_image: originalImageUrl } }
-        );
-
-        const aiImageUrl = extractUrl(output);
-        if (!aiImageUrl) throw new Error("AI returned invalid URL");
-
-        user.credits -= 1;
-        await user.save();
-
-        const newOrder = new Order({
-            userId, email, category, gender, aiImageUrl, originalImageUrl, status: 'completed'
-        });
-        await newOrder.save();
-
-        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
-
-    } catch (error) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        console.error("❌ [FACE-SWAP ERROR]:", error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 🚀 ROUTE 2: MAGIC PROMPT (Uses upload.none() to parse FormData text)
-app.post('/api/upload-prompt', upload.none(), async (req, res) => {
-    try {
-        const { userId, email, prompt } = req.body;
-        console.log("🪄 [AI] Magic Prompt Request for:", email);
-
-        if (!userId || !prompt) return res.status(400).json({ success: false, error: "Missing UserID or Prompt" });
-
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "No credits!" });
-
-        const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt: prompt } });
-        const aiImageUrl = extractUrl(output);
-
-        if (!aiImageUrl) throw new Error("AI returned invalid URL");
-
-        user.credits -= 1;
-        await user.save();
-
-        const newOrder = new Order({
-            userId, email, category: 'magic-prompt', aiImageUrl, status: 'completed'
-        });
-        await newOrder.save();
-
-        res.json({ success: true, ai_image_url: aiImageUrl });
-
-    } catch (error) {
-        console.error("❌ [PROMPT ERROR]:", error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Other routes (Auth, Profile, Gallery, Payments)
+// 🚀 FIX 1: Register Route (For Login/Signup)
 app.post('/register', async (req, res) => {
     try {
         const { email, firebaseUid } = req.body;
         let user = await User.findOne({ firebaseUid });
-        if (!user) { user = new User({ firebaseUid, email, credits: 5 }); await user.save(); }
+        if (!user) {
+            user = new User({ firebaseUid, email, credits: 5 });
+            await user.save();
+            console.log(`🆕 [NEW USER] Registered: ${email}`);
+        }
         res.json({ success: true });
-    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
+
+app.use('/api/payments', paymentRoutes);
 
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         let user = await User.findOne({ firebaseUid: req.params.userId });
-        if (!user) { user = new User({ firebaseUid: req.params.userId, email: "new@user.com", credits: 5 }); await user.save(); }
+        if (!user) {
+            user = new User({ firebaseUid: req.params.userId, email: "new@user.com", credits: 5 });
+            await user.save();
+        }
         res.json({ success: true, credits: user.credits, email: user.email });
-    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 🚀 FIX 2: Upload Route (Handles both modes and fixes Gender error)
+app.post('/upload', upload.single('image'), async (req, res) => {
+    try {
+        const { userId, email, mode, category, gender, prompt } = req.body;
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+
+        let aiImageUrl = "";
+        let originalImageUrl = "";
+
+        if (mode === 'faceswap') {
+            if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+            const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
+            originalImageUrl = uploadResult.secure_url;
+            aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
+        } else {
+            const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
+            aiImageUrl = Array.isArray(output) ? output[0] : output;
+        }
+
+        user.credits -= 1;
+        await user.save();
+
+        // server.js ke andar /upload route mein:
+
+const newOrder = new Order({
+    userId: userId,
+    email: email,
+    category: category || 'magic-prompt',
+    // 🚀 Agar faceswap hai toh gender bhejega, warna undefined (jo ki ab allowed hai)
+    gender: mode === 'faceswap' ? gender : undefined, 
+    aiImageUrl: aiImageUrl,
+    originalImageUrl: originalImageUrl,
+    status: 'completed'
+});
+        await newOrder.save();
+
+        if (req.file) fs.unlinkSync(req.file.path);
+       // Check karein ki aiImageUrl string hai ya object
+let finalStringUrl = "";
+if (typeof aiImageUrl === 'string') {
+    finalStringUrl = aiImageUrl;
+} else if (aiImageUrl && typeof aiImageUrl === 'object') {
+    // Agar object hai toh usme se URL nikaalein
+    finalStringUrl = aiImageUrl.url || aiImageUrl.output || "";
+}
+
+res.json({ 
+    success: true, 
+    ai_image_url: finalStringUrl, // Ab hamesa string jayegi
+    original_image_url: originalImageUrl 
+});
+    } catch (error) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
         res.json(photos);
-    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
-
-app.use('/api/payments', paymentRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`));
