@@ -28,8 +28,7 @@
         </div>
         <div id="user-profile" class="hidden flex items-center gap-4">
             <div class="flex items-center gap-2 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-                <i class="fa-solid fa-coins text-yellow-500"></i>
-                <span id="user-credits" class="text-sm font-bold text-indigo-700">0</span>
+                <i class="fa-solid fa-coins text-yellow-500"></i><span id="user-credits" class="text-sm font-bold text-indigo-700">0</span>
             </div>
             <button onclick="togglePricingModal()" class="bg-amber-500 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-amber-600 transition">Get Credits</button>
             <span id="user-email" class="text-sm font-medium text-slate-600"></span>
@@ -70,61 +69,37 @@
                 <button id="btn-mode-prompt" onclick="setMode('prompt')" class="text-xs font-bold px-4 py-2 rounded-full bg-slate-100 text-slate-600 transition">Magic Prompt Mode</button>
             </div>
             <div id="faceswap-elements" class="space-y-8">
-                <div>
-                    <p class="text-slate-500 text-sm mb-3">Select Gender</p>
-                    <div class="flex justify-center gap-4">
-                        <button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Man</button>
-                        <button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button>
-                    </div>
-                </div>
+                <div><p class="text-slate-500 text-sm mb-3">Select Gender</p><div class="flex justify-center gap-4"><button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold">Man</button><button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold">Woman</button></div></div>
                 <div id="preview-container" class="hidden"><img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg"></div>
                 <input type="file" id="imageInput" class="hidden" accept="image/*">
-                <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition"><i class="fa-solid fa-image mr-2"></i> Choose Image</button>
+                <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold">Choose Image</button>
             </div>
             <div id="prompt-elements" class="hidden space-y-4">
-                <div class="text-left"><label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label><textarea id="promptInput" rows="4" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="e.g. A majestic lion wearing a golden crown..."></textarea></div>
+                <div class="text-left"><label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label><textarea id="promptInput" rows="4" class="w-full px-4 py-3 rounded-xl border outline-none"></textarea></div>
             </div>
-            <button id="submitBtn" class="hidden w-full mt-8 bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
+            <button id="submitBtn" class="w-full mt-8 bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
         </div>
     </section>
 
-    <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[200] p-4">
-        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
-            <div class="bg-indigo-600 p-10 text-white md:w-1/3 flex flex-col justify-center">
-                <h2 class="text-3xl font-bold mb-4">Upgrade Your Studio 🚀</h2>
-                <p class="text-indigo-100">Get more credits and generate unlimited professional AI photos.</p>
-            </div>
-            <div class="p-10 md:w-2/3 bg-white relative">
-                <button onclick="togglePricingModal()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
-                <h3 class="text-xl font-bold text-slate-800 mb-8">Select a Plan</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div onclick="startPayment(499, 50)" class="border-2 border-slate-100 p-6 rounded-3xl hover:border-indigo-500 transition cursor-pointer group">
-                        <h4 class="text-lg font-bold text-slate-800">Starter Pack</h4>
-                        <div class="text-3xl font-extrabold text-indigo-600 my-2">₹499</div>
-                        <p class="text-slate-500 text-sm mb-6">50 AI Credits</p>
-                        <button class="w-full bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-700 py-2 rounded-xl font-bold transition">Buy Now</button>
-                    </div>
-                    <div onclick="startPayment(999, 120)" class="border-2 border-indigo-500 p-6 rounded-3xl bg-indigo-50 relative group">
-                        <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] px-3 py-1 rounded-full uppercase font-bold">Most Popular</span>
-                        <h4 class="text-lg font-bold text-slate-800">Pro Pack</h4>
-                        <div class="text-3xl font-extrabold text-indigo-600 my-2">₹999</div>
-                        <p class="text-slate-500 text-sm mb-6">120 AI Credits</p>
-                        <button class="w-full bg-indigo-600 text-white py-2 rounded-xl font-bold transition">Buy Now</button>
-                    </div>
-                </div>
+    <!-- Modals -->
+    <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 hidden flex items-center justify-center z-[200] p-4">
+        <div class="bg-white rounded-[2.5rem] p-10 w-full max-w-4xl relative">
+            <button onclick="togglePricingModal()" class="absolute top-6 right-6 text-slate-400"><i class="fas fa-times text-xl"></i></button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div onclick="startPayment(499, 50)" class="border p-6 rounded-3xl cursor-pointer"><h4>Starter</h4><div class="text-2xl font-bold">₹499 (50 Credits)</div></div>
+                <div onclick="startPayment(999, 120)" class="border-2 border-indigo-500 p-6 rounded-3xl bg-indigo-50"><h4>Pro</h4><div class="text-2xl font-bold">₹999 (120 Credits)</div></div>
             </div>
         </div>
     </div>
 
-    <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-50"><div class="bg-white p-10 rounded-3xl text-center"><div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div><h2 class="text-xl font-bold">AI is Working...</h2><p class="text-slate-500 text-sm">This takes about 45-60 seconds</p></div></div>
+    <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center z-50"><div class="bg-white p-10 rounded-3xl text-center"><div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div><p>AI is working...</p></div></div>
 
-    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+    <div id="successModal" class="fixed inset-0 bg-slate-900/90 hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
             <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
-            <p class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-            <div class="relative group mb-6">
-                <div class="comparison-container border-2 border-slate-100 shadow-inner">
+            <div class="relative mb-6">
+                <div class="comparison-container">
                     <div class="after-image w-full h-full"><img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl"></div>
                     <div id="beforeImageWrapper" class="before-image"><img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl"></div>
                     <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
@@ -132,13 +107,24 @@
                 </div>
             </div>
             <div class="flex flex-col gap-3">
-                <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try Another</button>
+                <a id="downloadBtn" href="#" download class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Download</a>
+                <button onclick="location.reload()" class="w-full bg-slate-100 py-3 rounded-xl font-bold">Try Another</button>
             </div>
         </div>
     </div>
 
-    <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4"><div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative"><button id="closeAuthBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fa-solid fa-xmark text-xl"></i></button><h2 id="auth-title" class="text-3xl font-bold text-slate-900 mb-2 text-center">Welcome Back</h2><p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Login to your account to continue</p><form id="authForm" class="space-y-4"><div class=""><label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label><input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"></div><div><label class="block text-sm font-medium text-slate-700 mb-1">Password</label><input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"></div><button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition mt-4">Login</button></form><div class="mt-6 text-center text-sm text-slate-500"><span id="auth-toggle-text">Don't have an account?</span><button type="button" id="auth-switch-btn" class="text-indigo-600 font-bold hover:underline ml-1">Sign Up</button></div></div></div>
+    <div id="authModal" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center z-[100] p-4">
+        <div class="bg-white p-8 rounded-[2rem] w-full max-w-md relative">
+            <button id="closeAuthBtn" class="absolute top-4 right-4 text-slate-400"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h2 id="auth-title" class="text-3xl font-bold text-center mb-8">Welcome Back</h2>
+            <form id="authForm" class="space-y-4">
+                <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border outline-none" placeholder="Email">
+                <input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border outline-none" placeholder="Password">
+                <button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold mt-4">Login</button>
+            </form>
+            <button id="auth-switch-btn" class="w-full mt-6 text-indigo-600 font-bold">Create Account</button>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -150,8 +136,7 @@
             projectId: "ai-photo-studio-a8a34",
             storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
             messagingSenderId: "416743083671",
-            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
-            measurementId: "G-HRKKHJKDJ8"
+            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -166,16 +151,13 @@
             document.getElementById('categories-section').classList.remove('hidden');
             document.getElementById('dashboard-section').classList.add('hidden');
             document.getElementById('upload-section').classList.add('hidden');
-            window.selectedCategory = ""; window.selectedGender = "";
         };
         
         window.switchAuthMode = () => {
             window.isLoginMode = !window.isLoginMode;
             document.getElementById('auth-title').innerText = window.isLoginMode ? "Welcome Back" : "Create Account";
-            document.getElementById('auth-subtitle').innerText = window.isLoginMode ? "Login to your account to continue" : "Join us to start generating AI photos";
             document.getElementById('authSubmitBtn').innerText = window.isLoginMode ? "Login" : "Sign Up";
-            document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
-            document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
+            document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Create Account" : "Back to Login";
         };
 
         document.getElementById('authForm').addEventListener('submit', async (e) => {
@@ -186,21 +168,19 @@
                 if (window.isLoginMode) {
                     await signInWithEmailAndPassword(auth, email, password);
                 } else {
-                    const signUpResult = await createUserWithEmailAndPassword(auth, email, password);
-                    const newUser = signUpResult.user;
+                    const res = await createUserWithEmailAndPassword(auth, email, password);
                     await fetch(`${BASE_URL}/register`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: newUser.email, firebaseUid: newUser.uid })
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email: res.user.email, firebaseUid: res.user.uid })
                     });
                 }
                 toggleAuthModal();
-            } catch (error) { alert("Auth Error: " + error.message); }
+            } catch (e) { alert(e.message); }
         });
 
-        window.handleLogout = async () => { await signOut(auth); location.reload(); };
+        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth).then(() => location.reload()));
         document.getElementById('loginBtn').addEventListener('click', toggleAuthModal);
-        document.getElementById('logoutBtn').addEventListener('click', handleLogout);
         document.getElementById('closeAuthBtn').addEventListener('click', toggleAuthModal);
         document.getElementById('auth-switch-btn').addEventListener('click', switchAuthMode);
 
@@ -215,40 +195,20 @@
 
         window.setMode = (mode) => {
             window.currentMode = mode;
-            const promptElements = document.getElementById('prompt-elements');
-            const faceswapElements = document.getElementById('faceswap-elements');
-            const submitBtn = document.getElementById('submitBtn');
-            const modeFaceswapBtn = document.getElementById('btn-mode-faceswap');
-            const modePromptBtn = document.getElementById('btn-mode-prompt');
-
-            if (mode === 'prompt') {
-                promptElements.classList.remove('hidden');
-                faceswapElements.classList.add('hidden');
-                submitBtn.classList.remove('hidden');
-                modePromptBtn.classList.replace('bg-slate-100', 'bg-indigo-600');
-                modePromptBtn.classList.replace('text-slate-600', 'text-white');
-                modeFaceswapBtn.classList.replace('bg-indigo-600', 'bg-slate-100');
-                modeFaceswapBtn.classList.replace('text-white', 'text-slate-600');
-            } else {
-                promptElements.classList.add('hidden');
-                faceswapElements.classList.remove('hidden');
-                submitBtn.classList.add('hidden');
-                modeFaceswapBtn.classList.replace('bg-slate-100', 'bg-indigo-600');
-                modeFaceswapBtn.classList.replace('text-slate-600', 'text-white');
-                modePromptBtn.classList.replace('bg-indigo-600', 'bg-slate-100');
-                modePromptBtn.classList.replace('text-white', 'text-slate-600');
-            }
+            document.getElementById('prompt-elements').classList.toggle('hidden', mode !== 'prompt');
+            document.getElementById('faceswap-elements').classList.toggle('hidden', mode !== 'faceswap');
+            document.getElementById('btn-mode-faceswap').className = mode === 'faceswap' ? 'text-xs font-bold px-4 py-2 rounded-full bg-indigo-600 text-white' : 'text-xs font-bold px-4 py-2 rounded-full bg-slate-100 text-slate-600';
+            document.getElementById('btn-mode-prompt').className = mode === 'prompt' ? 'text-xs font-bold px-4 py-2 rounded-full bg-indigo-600 text-white' : 'text-xs font-bold px-4 py-2 rounded-full bg-slate-100 text-slate-600';
         };
 
-        window.selectGender = (gender) => {
-            window.selectedGender = gender;
-            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
-            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+        window.selectGender = (g) => {
+            window.selectedGender = g;
+            document.getElementById('btn-man').classList.toggle('active', g === 'man');
+            document.getElementById('btn-woman').classList.toggle('active', g === 'woman');
         };
 
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
-            const submitBtn = document.getElementById('submitBtn');
             if (file) {
                 window.selectedFile = file;
                 const reader = new FileReader();
@@ -256,9 +216,6 @@
                     document.getElementById('imagePreview').src = event.target.result;
                     window.originalImageUrl = event.target.result; 
                     document.getElementById('preview-container').classList.remove('hidden');
-                    if (window.currentMode === 'faceswap') {
-                        submitBtn.classList.remove('hidden');
-                    }
                 };
                 reader.readAsDataURL(file);
             }
@@ -292,33 +249,35 @@
             document.getElementById('loadingModal').classList.remove('hidden');
 
             try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+                const endpoint = window.currentMode === 'faceswap' ? '/api/upload-faceswap' : '/api/upload-prompt';
+                const response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', body: formData });
                 const result = await response.json();
-                if (result.success) {
-                    // 🚀 FIX: Robust handling of ai_image_url to prevent [object Object]
-                    let finalAiUrl = result.ai_image_url;
-                    if (typeof finalAiUrl === 'object') {
-                        finalAiUrl = finalAiUrl.url || finalAiUrl.output || "";
-                    }
 
-                    document.getElementById('resultImage').src = finalAiUrl;
-                    if(window.originalImageUrl) {
-                        document.getElementById('originalImagePreview').src = window.originalImageUrl;
-                    }
-                    document.getElementById('downloadBtn').href = finalAiUrl;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
+                if (result.success) {
+                    document.getElementById('resultImage').src = result.ai_image_url;
                     
-                    const slider = document.getElementById('comparisonSlider');
                     const beforeWrapper = document.getElementById('beforeImageWrapper');
+                    const slider = document.getElementById('comparisonSlider');
                     const handle = document.getElementById('sliderHandle');
-                    if(slider) {
+
+                    if (window.currentMode === 'prompt' || !result.original_image_url) {
+                        beforeWrapper.classList.add('hidden');
+                        slider.classList.add('hidden');
+                        handle.classList.add('hidden');
+                    } else {
+                        beforeWrapper.classList.remove('hidden');
+                        slider.classList.remove('hidden');
+                        handle.classList.remove('hidden');
+                        document.getElementById('originalImagePreview').src = result.original_image_url;
                         slider.oninput = (e) => {
                             const val = e.target.value;
                             beforeWrapper.style.width = `${val}%`;
                             handle.style.left = `${val}%`;
                         };
                     }
+                    document.getElementById('downloadBtn').href = result.ai_image_url;
+                    document.getElementById('successModal').classList.remove('hidden');
+                    document.getElementById('loadingModal').classList.add('hidden');
                 } else {
                     throw new Error(result.error || "AI Generation failed");
                 }
@@ -392,12 +351,11 @@
                 });
                 const data = await response.json();
                 if (!data.success) throw new Error(data.error);
-                const options = {
-                    key: "rzp_test_T0igS1UI99gp4v", 
+                new Razorpay({
+                    key: "rzp_test_T0igS1UI99gp4v",
                     amount: amount * 100,
                     currency: "INR",
                     name: "AI Photo Studio",
-                    description: `${credits} AI Credits Plan`,
                     order_id: data.order.id,
                     handler: async function (res) {
                         const verifyRes = await fetch(`${BASE_URL}/api/payments/verify-payment`, {
@@ -418,9 +376,7 @@
                     },
                     prefill: { email: user.email },
                     theme: { color: "#4f46e5" }
-                };
-                const rzp = new Razorpay(options);
-                rzp.open();
+                }).open();
             } catch (error) { alert("❌ Payment Error: " + error.message); }
         };
     </script>
