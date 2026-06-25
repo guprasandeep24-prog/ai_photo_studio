@@ -51,7 +51,7 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// --- AI CORE LOGIC (Your Original Strategies) ---
+// --- AI CORE LOGIC (Face-Swap Only) ---
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
@@ -68,7 +68,8 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             const urlFromObj = output.output || output.url || output.image;
             if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
         }
-        // Strategy 4: Stream handling
+        
+        // Stream handling
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
             const chunks = [];
             for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
@@ -93,9 +94,8 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- ROUTES ---
 
-app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend (Face-Swap Mode) is LIVE!"));
 
-// 🚀 FIX 1: Register Route (For Login/Signup)
 app.post('/register', async (req, res) => {
     try {
         const { email, firebaseUid } = req.body;
@@ -126,61 +126,54 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// 🚀 FIX 2: Upload Route (Handles both modes and fixes Gender error)
+// 🚀 UPDATED: Upload Route (Face-Swap Only)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
-        const { userId, email, mode, category, gender, prompt } = req.body;
+        const { userId, email, category, gender } = req.body;
+        
+        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+        if (!category || !gender) return res.status(400).json({ success: false, error: "Category and Gender are required" });
 
-        let aiImageUrl = "";
-        let originalImageUrl = "";
+        // 2. Upload original image to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
+        const originalImageUrl = uploadResult.secure_url;
 
-        if (mode === 'faceswap') {
-            if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
-            const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
-            originalImageUrl = uploadResult.secure_url;
-            aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
-        } else {
-            const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
-            aiImageUrl = Array.isArray(output) ? output[0] : output;
-        }
+        // 3. Run Face-Swap AI
+        const aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
 
+        // 4. Deduct Credit
         user.credits -= 1;
         await user.save();
 
-        // server.js ke andar /upload route mein:
-
-const newOrder = new Order({
-    userId: userId,
-    email: email,
-    category: category || 'magic-prompt',
-    // 🚀 Agar faceswap hai toh gender bhejega, warna undefined (jo ki ab allowed hai)
-    gender: mode === 'faceswap' ? gender : undefined, 
-    aiImageUrl: aiImageUrl,
-    originalImageUrl: originalImageUrl,
-    status: 'completed'
-});
+        // 5. Save Order
+        const newOrder = new Order({
+            userId: userId,
+            email: email,
+            category: category,
+            gender: gender,
+            aiImageUrl: aiImageUrl,
+            originalImageUrl: originalImageUrl,
+            status: 'completed'
+        });
         await newOrder.save();
 
+        // 6. Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
-       // Check karein ki aiImageUrl string hai ya object
-let finalStringUrl = "";
-if (typeof aiImageUrl === 'string') {
-    finalStringUrl = aiImageUrl;
-} else if (aiImageUrl && typeof aiImageUrl === 'object') {
-    // Agar object hai toh usme se URL nikaalein
-    finalStringUrl = aiImageUrl.url || aiImageUrl.output || "";
-}
 
-res.json({ 
-    success: true, 
-    ai_image_url: finalStringUrl, // Ab hamesa string jayegi
-    original_image_url: originalImageUrl 
-});
+        // 7. Send Response
+        res.json({ 
+            success: true, 
+            ai_image_url: aiImageUrl, 
+            original_image_url: originalImageUrl 
+        });
+
     } catch (error) {
         if (req.file) fs.unlinkSync(req.file.path);
+        console.error("❌ [UPLOAD ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
