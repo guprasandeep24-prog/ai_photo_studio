@@ -165,7 +165,20 @@ const newOrder = new Order({
         await newOrder.save();
 
         if (req.file) fs.unlinkSync(req.file.path);
-        res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
+       // Check karein ki aiImageUrl string hai ya object
+let finalStringUrl = "";
+if (typeof aiImageUrl === 'string') {
+    finalStringUrl = aiImageUrl;
+} else if (aiImageUrl && typeof aiImageUrl === 'object') {
+    // Agar object hai toh usme se URL nikaalein
+    finalStringUrl = aiImageUrl.url || aiImageUrl.output || "";
+}
+
+res.json({ 
+    success: true, 
+    ai_image_url: finalStringUrl, // Ab hamesa string jayegi
+    original_image_url: originalImageUrl 
+});
     } catch (error) {
         if (req.file) fs.unlinkSync(req.file.path);
         res.status(500).json({ success: false, error: error.message });
