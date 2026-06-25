@@ -14,24 +14,16 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// --- 1. IMPROVED CORS ---
+// --- 1. MIDDLEWARE ---
 app.use(cors({
     origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 2. HEALTH CHECK ROUTE ---
-app.get('/', (req, res) => {
-    res.send("🚀 AI Photo Studio Backend is LIVE and running!");
-});
-
-// 3. Initialization
-console.log("🛠️ [SYSTEM] Initializing AI Studio Server...");
-
+// --- 2. INIT ---
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
@@ -60,51 +52,38 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🚀 YOUR ORIGINAL "BRUTE FORCE" AI LOGIC (STRATEGIES 1-4)
+// 🛠️ HELPER: Extract URL from any Replicate output (String, Array, or Object)
+function extractUrl(output) {
+    if (!output) return "";
+    if (typeof output === 'string') return output;
+    if (Array.isArray(output) && output.length > 0) {
+        const first = output[0];
+        if (typeof first === 'string') return first;
+        if (typeof first === 'object') return first.url || first.output || first.image || "";
+    }
+    if (typeof output === 'object') {
+        return output.url || output.output || output.image || "";
+    }
+    return "";
+}
+
+// --- 3. AI CORE LOGIC (Your Original Strategies) ---
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-    
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
-    console.log("🖼️ [AI] Target:", targetImageUrl);
-    console.log("👤 [AI] Swap with:", userCloudinaryUrl);
 
     try {
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
-            { 
-                input: { 
-                    target_image: targetImageUrl, 
-                    swap_image: userCloudinaryUrl 
-                } 
-            }
+            { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
-        // --- STRATEGY 1: Direct String ---
-        if (typeof output === 'string' && output.startsWith('http')) {
-            console.log("✅ [AI] Strategy 1 Success: Found direct URL string.");
-            return output;
-        }
+        // Use our helper to parse the output
+        let finalUrl = extractUrl(output);
 
-        // --- STRATEGY 2: Array ---
-        if (Array.isArray(output) && output.length > 0) {
-            if (typeof output[0] === 'string' && output[0].startsWith('http')) {
-                console.log("✅ [AI] Strategy 2 Success: Found URL in array.");
-                return output[0];
-            }
-        }
-
-        // --- STRATEGY 3: Object with keys ---
-        if (output && typeof output === 'object' && !Array.isArray(output)) {
-            const urlFromObj = output.output || output.url || output.image || (output.data ? output.data[0] : null);
-            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) {
-                console.log("✅ [AI] Strategy 3 Success: Found URL inside object.");
-                return urlFromObj;
-            }
-        }
-
-        // --- STRATEGY 4: The "Heavy Lifting" (Stream/Buffer) ---
-        try {
-            console.log("🌊 [AI] Strategy 4: Attempting to consume output as a Stream...");
+        // If it's still not a string URL, try Stream Strategy
+        if (!finalUrl || !finalUrl.startsWith('http')) {
+            console.log("🌊 [AI] Strategy 4: Attempting Stream Parsing...");
             const chunks = [];
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
@@ -112,28 +91,17 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             const buffer = Buffer.concat(chunks);
             const contentString = buffer.toString().trim();
 
-            if (contentString.startsWith('http')) {
-                console.log("✅ [AI] Strategy 4 Success: Stream was actually a URL string.");
-                return contentString;
-            }
-
+            if (contentString.startsWith('http')) return contentString;
             if (buffer.length > 0) {
-                console.log(`📤 [AI] Strategy 4 Success: Stream was image data (${buffer.length} bytes). Uploading...`);
                 const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_stream(
-                        { folder: "ai_studio_final" }, 
-                        (error, result) => {
-                            if (error) reject(error); else resolve(result);
-                        }
-                    ).end(buffer);
+                    cloudinary.uploader.upload_stream({ folder: "ai_studio_final" }, (err, res) => {
+                        if (err) reject(err); else resolve(res);
+                    }).end(buffer);
                 });
                 return uploadResult.secure_url;
             }
-        } catch (streamError) {
-            console.error("❌ [AI] Strategy 4 (Stream) failed:", streamError.message);
         }
-
-        throw new Error(`AI returned unparseable format: ${JSON.stringify(output).substring(0, 100)}`);
+        return finalUrl;
 
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
@@ -143,7 +111,9 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- 4. ROUTES ---
 
-// 🚀 REGISTER ROUTE
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
+
+// Register
 app.post('/register', async (req, res) => {
     try {
         const { email, firebaseUid } = req.body;
@@ -151,7 +121,6 @@ app.post('/register', async (req, res) => {
         if (!user) {
             user = new User({ firebaseUid, email, credits: 5 });
             await user.save();
-            console.log(`🆕 [NEW USER] Registered: ${email}`);
         }
         res.json({ success: true });
     } catch (error) {
@@ -159,12 +128,10 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// 🚀 UPLOAD ROUTE (Includes the Magic Prompt part you were missing)
+// Upload & AI
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, mode, category, gender, prompt } = req.body;
-
-        // 1. Check User
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
@@ -172,53 +139,42 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         let aiImageUrl = "";
         let originalImageUrl = "";
 
-        // 2. Handle Modes (Face-Swap vs Magic Prompt)
         if (mode === 'faceswap') {
             if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
-
-            // Upload selfie to Cloudinary
             const uploadRes = await new Promise((resolve, reject) => {
                 cloudinary.uploader.upload_stream({ folder: "user_selfies" }, (err, res) => {
                     if (err) reject(err); else resolve(res);
                 }).end(fs.createReadStream(req.file.path));
             });
             originalImageUrl = uploadRes.secure_url;
-
-            // Run Face-Swap
             aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
 
         } else if (mode === 'prompt') {
-            // 🚀 YOUR MAGIC PROMPT MODE
             console.log("🪄 [AI] Starting Magic Prompt Mode...");
             const output = await replicate.run(
                 "black-forest-labs/flux-schnell",
                 { input: { prompt: prompt } }
             );
-            
-            // Parse output
-            if (typeof output === 'string') aiImageUrl = output;
-            else if (Array.isArray(output)) aiImageUrl = output[0];
-            else if (typeof output === 'object') aiImageUrl = output.url || output.output || "";
+            // 🚀 FIX: Use the helper to prevent "startsWith is not a function"
+            aiImageUrl = extractUrl(output);
         }
 
-        if (!aiImageUrl || !aiImageUrl.startsWith('http')) {
-            throw new Error("AI failed to generate a valid URL.");
+        // Final Validation
+        if (!aiImageUrl || typeof aiImageUrl !== 'string' || !aiImageUrl.startsWith('http')) {
+            throw new Error("AI returned an invalid image URL. Please try again.");
         }
 
-        // 3. Deduct Credits & Save Order
         user.credits -= 1;
         await user.save();
 
         const newOrder = new Order({
             userId, email, category: category || 'magic-prompt',
-            gender: mode === 'faceswap' ? gender : undefined, // Fix for gender validation
+            gender: mode === 'faceswap' ? gender : undefined,
             aiImageUrl, originalImageUrl, status: 'completed'
         });
         await newOrder.save();
 
-        // 4. Cleanup
         if (req.file) fs.unlinkSync(req.file.path);
-
         res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
 
     } catch (error) {
@@ -228,12 +184,12 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// 🚀 PROFILE ROUTE
+// Profile
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         let user = await User.findOne({ firebaseUid: req.params.userId });
         if (!user) {
-            user = new User({ firebaseUid: req.params.userId, email: "new-user@example.com", credits: 5 });
+            user = new User({ firebaseUid: req.params.userId, email: "new@user.com", credits: 5 });
             await user.save();
         }
         res.json({ success: true, credits: user.credits, email: user.email });
@@ -242,7 +198,7 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// 🚀 GALLERY ROUTE
+// Gallery
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
