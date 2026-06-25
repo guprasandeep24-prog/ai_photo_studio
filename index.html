@@ -12,8 +12,6 @@
         body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
         .category-card:hover { transform: translateY(-8px); transition: all 0.3s ease; }
         .gender-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
-        
-        /* Slider Styles */
         .comparison-container { position: relative; width: 100%; height: 350px; overflow: hidden; border-radius: 1.5rem; }
         .before-image { position: absolute; top: 0; left: 0; width: 50%; height: 100%; overflow: hidden; z-index: 10; border-right: 3px solid white; }
         .before-image img, .after-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -23,7 +21,6 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
 
-    <!-- Navbar -->
     <nav class="container mx-auto px-6 py-6 flex justify-between items-center">
         <div class="text-2xl font-bold text-indigo-600">AI <span class="text-slate-800">PhotoStudio</span></div>
         <div id="auth-buttons">
@@ -40,13 +37,11 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
     <header class="container mx-auto px-6 py-12 text-center">
         <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6">Get Professional Photos in <span class="text-indigo-600">Seconds</span></h1>
         <p class="text-lg text-slate-600 mb-10 max-w-2xl mx-auto">Choose a category, select gender, upload your selfie, and let our AI handle the rest.</p>
     </header>
 
-    <!-- Dashboard / Gallery Section -->
     <section id="dashboard-section" class="hidden container mx-auto px-6 py-10">
         <div class="flex justify-between items-end mb-8">
             <div><h2 class="text-3xl font-bold text-slate-900">My AI Gallery</h2><p class="text-slate-500">Your transformed professional photos</p></div>
@@ -57,7 +52,6 @@
         </div>
     </section>
 
-    <!-- Category Section -->
     <section id="categories-section" class="container mx-auto px-6 py-10">
         <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">Select a Category</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -67,20 +61,14 @@
         </div>
     </section>
 
-    <!-- Upload Section -->
     <section id="upload-section" class="hidden container mx-auto px-6 py-12">
         <div class="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border-2 border-dashed border-indigo-200 text-center">
             <button onclick="showUploadSection()" class="float-right text-slate-400 hover:text-slate-600"><i class="fa-solid fa-arrow-left"></i> Back</button>
-            
             <h2 id="selected-cat-title" class="text-2xl font-bold mb-6 text-indigo-600 pt-4">Upload Photo</h2>
-
-            <!-- Mode Switcher -->
             <div class="flex justify-center gap-4 mb-8">
                 <button id="btn-mode-faceswap" onclick="setMode('faceswap')" class="text-xs font-bold px-4 py-2 rounded-full bg-indigo-600 text-white transition">Face-Swap Mode</button>
                 <button id="btn-mode-prompt" onclick="setMode('prompt')" class="text-xs font-bold px-4 py-2 rounded-full bg-slate-100 text-slate-600 transition">Magic Prompt Mode</button>
             </div>
-
-            <!-- GROUP 1: FACE-SWAP ELEMENTS (Gender & Image) -->
             <div id="faceswap-elements" class="space-y-8">
                 <div>
                     <p class="text-slate-500 text-sm mb-3">Select Gender</p>
@@ -89,32 +77,17 @@
                         <button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button>
                     </div>
                 </div>
-
-                <div id="preview-container" class="hidden">
-                    <img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg">
-                </div>
-
-                <div>
-                    <input type="file" id="imageInput" class="hidden" accept="image/*">
-                    <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition">
-                        <i class="fa-solid fa-image mr-2"></i> Choose Image
-                    </button>
-                </div>
+                <div id="preview-container" class="hidden"><img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg"></div>
+                <input type="file" id="imageInput" class="hidden" accept="image/*">
+                <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition"><i class="fa-solid fa-image mr-2"></i> Choose Image</button>
             </div>
-
-            <!-- GROUP 2: PROMPT ELEMENTS -->
             <div id="prompt-elements" class="hidden space-y-4">
-                <div class="text-left">
-                    <label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label>
-                    <textarea id="promptInput" rows="4" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="e.g. A majestic lion wearing a golden crown..."></textarea>
-                </div>
+                <div class="text-left"><label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label><textarea id="promptInput" rows="4" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="e.g. A majestic lion wearing a golden crown..."></textarea></div>
             </div>
-
             <button id="submitBtn" class="hidden w-full mt-8 bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
         </div>
     </section>
 
-    <!-- Pricing Modal -->
     <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[200] p-4">
         <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
             <div class="bg-indigo-600 p-10 text-white md:w-1/3 flex flex-col justify-center">
@@ -143,30 +116,21 @@
         </div>
     </div>
 
-    <!-- Loading Modal -->
     <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-50"><div class="bg-white p-10 rounded-3xl text-center"><div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div><h2 class="text-xl font-bold">AI is Working...</h2><p class="text-slate-500 text-sm">This takes about 45-60 seconds</p></div></div>
 
-    <!-- Success Modal -->
     <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
             <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
             <p class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-            
-            <!-- Comparison Slider -->
             <div class="relative group mb-6">
                 <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                    <div class="after-image w-full h-full">
-                        <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl">
-                    </div>
-                    <div id="beforeImageWrapper" class="before-image">
-                        <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl">
-                    </div>
-                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                    <div class="after-image w-full h-full"><img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl"></div>
+                    <div id="beforeImageWrapper" class="before-image"><img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl"></div>
                     <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
                 </div>
             </div>
-
             <div class="flex flex-col gap-3">
                 <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
                 <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try Another</button>
@@ -174,7 +138,6 @@
         </div>
     </div>
 
-    <!-- Auth Modal -->
     <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4"><div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative"><button id="closeAuthBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fa-solid fa-xmark text-xl"></i></button><h2 id="auth-title" class="text-3xl font-bold text-slate-900 mb-2 text-center">Welcome Back</h2><p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Login to your account to continue</p><form id="authForm" class="space-y-4"><div class=""><label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label><input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"></div><div><label class="block text-sm font-medium text-slate-700 mb-1">Password</label><input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"></div><button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition mt-4">Login</button></form><div class="mt-6 text-center text-sm text-slate-500"><span id="auth-toggle-text">Don't have an account?</span><button type="button" id="auth-switch-btn" class="text-indigo-600 font-bold hover:underline ml-1">Sign Up</button></div></div></div>
 
     <script type="module">
@@ -197,9 +160,14 @@
 
         window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.originalImageUrl = ""; window.isLoginMode = true; window.currentMode = 'faceswap';
 
-        // Auth & Nav Functions
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
         window.togglePricingModal = () => document.getElementById('pricingModal').classList.toggle('hidden');
+        window.showUploadSection = () => {
+            document.getElementById('categories-section').classList.remove('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+            document.getElementById('upload-section').classList.add('hidden');
+            window.selectedCategory = ""; window.selectedGender = "";
+        };
         
         window.switchAuthMode = () => {
             window.isLoginMode = !window.isLoginMode;
@@ -227,12 +195,14 @@
                     });
                 }
                 toggleAuthModal();
-            } catch (error) { 
-                alert("Auth Error: " + error.message); 
-            }
+            } catch (error) { alert("Auth Error: " + error.message); }
         });
 
         window.handleLogout = async () => { await signOut(auth); location.reload(); };
+        document.getElementById('loginBtn').addEventListener('click', toggleAuthModal);
+        document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+        document.getElementById('closeAuthBtn').addEventListener('click', toggleAuthModal);
+        document.getElementById('auth-switch-btn').addEventListener('click', switchAuthMode);
 
         window.selectCategory = (cat) => {
             window.selectedCategory = cat; 
@@ -241,18 +211,6 @@
             document.getElementById('categories-section').classList.add('hidden');
             document.getElementById('dashboard-section').classList.add('hidden');
             document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
-        };
-
-        window.showUploadSection = () => {
-            document.getElementById('categories-section').classList.remove('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-            document.getElementById('upload-section').classList.add('hidden');
-            window.selectedCategory = ""; window.selectedGender = "";
-        };
-
-        window.hideUploadSection = () => {
-            document.getElementById('upload-section').classList.add('hidden');
-            document.getElementById('categories-section').classList.remove('hidden');
         };
 
         window.setMode = (mode) => {
@@ -355,11 +313,11 @@
                     const beforeWrapper = document.getElementById('beforeImageWrapper');
                     const handle = document.getElementById('sliderHandle');
                     if(slider) {
-                        slider.addEventListener('input', (e) => {
+                        slider.oninput = (e) => {
                             const val = e.target.value;
                             beforeWrapper.style.width = `${val}%`;
                             handle.style.left = `${val}%`;
-                        });
+                        };
                     }
                 } else {
                     throw new Error(result.error || "AI Generation failed");
@@ -422,11 +380,6 @@
                 }
             } catch (error) { console.error(error); }
         }
-
-        document.getElementById('loginBtn').addEventListener('click', () => toggleAuthModal());
-        document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
-        document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
-        document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
 
         window.startPayment = async (amount, credits) => {
             const user = auth.currentUser;
