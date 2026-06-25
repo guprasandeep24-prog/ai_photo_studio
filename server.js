@@ -137,30 +137,15 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         let aiImageUrl = "";
         let originalImageUrl = "";
 
-        // server.js ke andar /upload route mein:
-
-if (mode === 'faceswap') {
-    if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
-    const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
-    originalImageUrl = uploadResult.secure_url;
-    aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
-} else if (mode === 'prompt') {
-    const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt: prompt } });
-    
-    // 🚀 FIX: Ensure aiImageUrl is a STRING, not an object
-    if (typeof output === 'string') {
-        aiImageUrl = output;
-    } else if (Array.isArray(output)) {
-        aiImageUrl = output[0];
-    } else if (typeof output === 'object') {
-        aiImageUrl = output.url || output.output || output[0] || ""; 
-    }
-}
-
-// Ek aur safety check: Agar aiImageUrl abhi bhi object hai
-if (typeof aiImageUrl === 'object') {
-    aiImageUrl = aiImageUrl.url || aiImageUrl.output || "";
-}
+        if (mode === 'faceswap') {
+            if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+            const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
+            originalImageUrl = uploadResult.secure_url;
+            aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
+        } else {
+            const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
+            aiImageUrl = Array.isArray(output) ? output[0] : output;
+        }
 
         user.credits -= 1;
         await user.save();

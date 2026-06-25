@@ -276,58 +276,47 @@
             }
         });
 
-        // ✅ CORRECTED & COMPLETE SUBMIT BUTTON LOGIC
-document.getElementById('submitBtn').addEventListener('click', async function() {
-    const user = auth.currentUser;
-    if (!user) return alert("Please Login first!");
-    
-    // 1. Validation
-    if (window.currentMode === 'faceswap') {
-        if (!window.selectedCategory) return alert("Please select a Category!");
-        if (!window.selectedGender) return alert("Please select Gender!");
-        if (!window.selectedFile) return alert("Please select an image!");
-    } else {
-        const promptText = document.getElementById('promptInput').value;
-        if (!promptText) return alert("Please write a prompt!");
-    }
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            const user = auth.currentUser;
+            if (!user) return alert("Please Login first!");
+            
+            const formData = new FormData();
+            formData.append('userId', user.uid);
+            formData.append('email', user.email);
+            formData.append('mode', window.currentMode);
+            formData.append('category', window.selectedCategory);
+            formData.append('gender', window.selectedGender);
+            formData.append('prompt', document.getElementById('promptInput').value);
+            if (window.selectedFile) formData.append('image', window.selectedFile);
 
-    // 2. Prepare Data
-    const formData = new FormData();
-    formData.append('userId', user.uid);
-    formData.append('email', user.email);
-    formData.append('mode', window.currentMode);
+            document.getElementById('loadingModal').classList.remove('hidden');
 
-    if (window.currentMode === 'faceswap') {
-        formData.append('category', window.selectedCategory);
-        formData.append('gender', window.selectedGender);
-        formData.append('image', window.selectedFile);
-    } else {
-        formData.append('prompt', document.getElementById('promptInput').value);
-    }
-
-    // 3. Show Loading
-    document.getElementById('loadingModal').classList.remove('hidden');
-
-// index.html ke submitBtn click handler mein:
-
-try {
-    const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-    const result = await response.json();
-
-    // 🚀 FIX: Sirf tabhi modal dikhao agar success TRUE ho AUR image URL maujood ho
-    if (result.success && result.ai_image_url && result.ai_image_url.startsWith('http')) {
-        document.getElementById('resultImage').src = result.ai_image_url;
-        // ... baaki modal logic ...
-        document.getElementById('successModal').classList.remove('hidden');
-    } else {
-        // Agar success false hai ya URL nahi hai, toh error dikhao
-        throw new Error(result.error || "AI failed to provide a valid image URL.");
-    }
-} catch (error) {
-    alert("❌ Error: " + error.message);
-    document.getElementById('loadingModal').classList.add('hidden');
-}
-});
+            try {
+                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('resultImage').src = result.ai_image_url;
+                    document.getElementById('originalImagePreview').src = result.original_image_url;
+                    document.getElementById('downloadBtn').href = result.ai_image_url;
+                    document.getElementById('successModal').classList.remove('hidden');
+                    document.getElementById('loadingModal').classList.add('hidden');
+                    
+                    const slider = document.getElementById('comparisonSlider');
+                    const beforeWrapper = document.getElementById('beforeImageWrapper');
+                    const handle = document.getElementById('sliderHandle');
+                    slider.oninput = (e) => {
+                        const val = e.target.value;
+                        beforeWrapper.style.width = `${val}%`;
+                        handle.style.left = `${val}%`;
+                    };
+                } else {
+                    throw new Error(result.error || "AI Generation failed");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+                document.getElementById('loadingModal').classList.add('hidden');
+            }
+        });
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
