@@ -51,17 +51,50 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🛠️ SUPER-ROBUST URL EXTRACTOR (Handles String, Array, and Objects)
+// 🛠️ GOD-MODE URL EXTRACTOR (Handles everything from Replicate)
 function extractUrl(output) {
-    if (!output) return "";
-    if (typeof output === 'string') return output.startsWith('http') ? output : "";
-    if (Array.isArray(output) && output.length > 0) return extractUrl(output[0]);
-    if (typeof output === 'object') {
-        const keys = ['url', 'output', 'image', 'secure_url'];
-        for (let key of keys) {
-            if (output[key] && typeof output[key] === 'string' && output[key].startsWith('http')) return output[key];
+    if (!output) {
+        console.error("❌ [DEBUG] extractUrl received empty/null output");
+        return "";
+    }
+
+    // Case 1: It's already a valid URL string
+    if (typeof output === 'string') {
+        if (output.startsWith('http')) return output;
+        // If it's a string but not a URL, try to find a URL pattern
+        const match = output.match(/https?:\/\/[^\s]+/);
+        return match ? match[0] : "";
+    }
+
+    // Case 2: It's an array (very common in Replicate)
+    if (Array.isArray(output)) {
+        console.log(`🔍 [DEBUG] Array detected. Length: ${output.length}`);
+        for (let item of output) {
+            const url = extractUrl(item); // Recursive call to handle nested arrays/objects
+            if (url) return url;
         }
     }
+
+    // Case 3: It's an object
+    if (typeof output === 'object') {
+        console.log("🔍 [DEBUG] Object detected. Keys:", Object.keys(output));
+        // Standard Replicate response keys
+        const possibleKeys = ['url', 'output', 'image', 'secure_url', 'href', 'data'];
+        for (let key of possibleKeys) {
+            if (output[key]) {
+                const val = output[key];
+                if (typeof val === 'string' && val.startsWith('http')) return val;
+                if (typeof val === 'object') return extractUrl(val); // Recursive call for nested objects
+            }
+        }
+        
+        // Special case for 'data' array inside object
+        if (output.data && Array.isArray(output.data)) {
+            return extractUrl(output.data[0]);
+        }
+    }
+
+    console.error("❌ [DEBUG] extractUrl failed to find a URL in:", JSON.stringify(output).substring(0, 200));
     return "";
 }
 
@@ -138,8 +171,17 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             aiImageUrl = extractUrl(output);
         }
 
-        if (!aiImageUrl || !aiImageUrl.startsWith('http')) {
-            throw new Error("AI returned an invalid image URL. Please try a different prompt.");
+        // server.js ke /upload route mein:
+
+// Final Validation
+if (!aiImageUrl || typeof aiImageUrl !== 'string' || !aiImageUrl.startsWith('http')) {
+    // 🚀 AGAR FAIL HOTA HAI, TOH REPLICATE KA ASLI OUTPUT LOG KAREIN
+    console.error("❌ [CRITICAL] AI URL Validation Failed!");
+    console.error("Reason: URL is empty, not a string, or doesn's start with http");
+    console.error("Actual Value received:", aiImageUrl);
+    
+    throw new Error("AI failed to generate a valid image URL. Please try a different prompt.");
+
         }
 
         user.credits -= 1;
