@@ -35,7 +35,6 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Multer Setup for Face-Swap
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -52,51 +51,46 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// Helper to parse Replicate Output
-function parseReplicateOutput(output) {
+function extractUrl(output) {
     if (!output) return "";
     if (typeof output === 'string') return output.startsWith('http') ? output : "";
-    if (Array.isArray(output) && output.length > 0) {
-        const first = output[0];
-        if (typeof first === 'string') return first;
-        if (typeof first === 'object') return first.url || first.output || first.image || "";
-    }
+    if (Array.isArray(output) && output.length > 0) return extractUrl(output[0]);
     if (typeof output === 'object') {
-        return output.url || output.output || output.image || "";
+        const keys = ['url', 'output', 'image', 'secure_url'];
+        for (let key of keys) {
+            if (output[key] && typeof output[key] === 'string' && output[key].startsWith('http')) return output[key];
+        }
     }
     return "";
 }
 
 // --- ROUTES ---
 
-app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
+app.get('/', (req, res) => res.send("🚀 Backend Live"));
 
-// 🚀 ROUTE 1: FACE-SWAP (Dedicated)
+// 🚀 ROUTE 1: FACE-SWAP (Uses Multer for File + Text)
 app.post('/api/upload-faceswap', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender } = req.body;
-        if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+        console.log("🔄 Face-Swap Request received for:", email);
+
+        if (!userId || !req.file) return res.status(400).json({ success: false, error: "Missing UserID or Image" });
 
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "No credits!" });
 
-        // 1. Upload Selfie to Cloudinary
-        const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
-        const originalImageUrl = uploadResult.secure_url;
+        const uploadRes = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
+        const originalImageUrl = uploadRes.secure_url;
 
-        // 2. Run AI Face-Swap
         const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-        console.log("🤖 [AI] Running Face-Swap for:", email);
-        
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { input: { target_image: targetImageUrl, swap_image: originalImageUrl } }
         );
 
-        const aiImageUrl = parseReplicateOutput(output);
+        const aiImageUrl = extractUrl(output);
         if (!aiImageUrl) throw new Error("AI returned invalid URL");
 
-        // 3. Save Order & Deduct Credit
         user.credits -= 1;
         await user.save();
 
@@ -115,23 +109,21 @@ app.post('/api/upload-faceswap', upload.single('image'), async (req, res) => {
     }
 });
 
-// 🚀 ROUTE 2: MAGIC PROMPT (Dedicated)
-app.post('/api/upload-prompt', async (req, res) => {
+// 🚀 ROUTE 2: MAGIC PROMPT (Uses upload.none() to parse FormData text)
+app.post('/api/upload-prompt', upload.none(), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
+        console.log("🪄 [AI] Magic Prompt Request for:", email);
+
+        if (!userId || !prompt) return res.status(400).json({ success: false, error: "Missing UserID or Prompt" });
+
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "No credits!" });
 
-        console.log("🪄 [AI] Starting Magic Prompt for:", email, "| Prompt:", prompt);
         const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt: prompt } });
-        
-        console.log("DEBUG: Magic Prompt Raw Output:", JSON.stringify(output));
-        const aiImageUrl = parseReplicateOutput(output);
+        const aiImageUrl = extractUrl(output);
 
-        if (!aiImageUrl) {
-            console.error("❌ [MAGIC PROMPT ERROR] Empty Output:", JSON.stringify(output));
-            throw new Error("AI returned an empty response. Try a different prompt.");
-        }
+        if (!aiImageUrl) throw new Error("AI returned invalid URL");
 
         user.credits -= 1;
         await user.save();
@@ -149,7 +141,7 @@ app.post('/api/upload-prompt', async (req, res) => {
     }
 });
 
-// Auth & Profile & Payments
+// Other routes (Auth, Profile, Gallery, Payments)
 app.post('/register', async (req, res) => {
     try {
         const { email, firebaseUid } = req.body;

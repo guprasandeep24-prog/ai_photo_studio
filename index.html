@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device4, initial-scale=1.0">
     <title>AI Photo Studio | Professional AI Transformation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -64,35 +64,45 @@
         <div class="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border-2 border-dashed border-indigo-200 text-center">
             <button onclick="showUploadSection()" class="float-right text-slate-400 hover:text-slate-600"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <h2 id="selected-cat-title" class="text-2xl font-bold mb-6 text-indigo-600 pt-4">Upload Photo</h2>
+
             <div class="flex justify-center gap-4 mb-8">
                 <button id="btn-mode-faceswap" onclick="setMode('faceswap')" class="text-xs font-bold px-4 py-2 rounded-full bg-indigo-600 text-white transition">Face-Swap Mode</button>
                 <button id="btn-mode-prompt" onclick="setMode('prompt')" class="text-xs font-bold px-4 py-2 rounded-full bg-slate-100 text-slate-600 transition">Magic Prompt Mode</button>
             </div>
+
             <div id="faceswap-elements" class="space-y-8">
-                <div><p class="text-slate-500 text-sm mb-3">Select Gender</p><div class="flex justify-center gap-4"><button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold">Man</button><button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold">Woman</button></div></div>
+                <div>
+                    <p class="text-slate-500 text-sm mb-3">Select Gender</p>
+                    <div class="flex justify-center gap-4">
+                        <button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold">Man</button>
+                        <button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold">Woman</button>
+                    </div>
+                </div>
                 <div id="preview-container" class="hidden"><img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg"></div>
                 <input type="file" id="imageInput" class="hidden" accept="image/*">
                 <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold">Choose Image</button>
             </div>
+
             <div id="prompt-elements" class="hidden space-y-4">
-                <div class="text-left"><label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label><textarea id="promptInput" rows="4" class="w-full px-4 py-3 rounded-xl border outline-none"></textarea></div>
+                <div class="text-left"><label class="block text-slate-700 text-sm font-bold mb-2">Describe your imagination:</label><textarea id="promptInput" rows="4" class="w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. A majestic lion wearing a golden crown..."></textarea></div>
             </div>
-            <button id="submitBtn" class="w-full mt-8 bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
+
+            <button id="submitBtn" class="hidden w-full mt-8 bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
         </div>
     </section>
 
-    <!-- Modals -->
+    <!-- Modals (All original modals) -->
     <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 hidden flex items-center justify-center z-[200] p-4">
         <div class="bg-white rounded-[2.5rem] p-10 w-full max-w-4xl relative">
             <button onclick="togglePricingModal()" class="absolute top-6 right-6 text-slate-400"><i class="fas fa-times text-xl"></i></button>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div onclick="startPayment(499, 50)" class="border p-6 rounded-3xl cursor-pointer"><h4>Starter</h4><div class="text-2xl font-bold">₹499 (50 Credits)</div></div>
-                <div onclick="startPayment(999, 120)" class="border-2 border-indigo-500 p-6 rounded-3xl bg-indigo-50"><h4>Pro</h4><div class="text-2xl font-bold">₹999 (120 Credits)</div></div>
+                <div onclick="startPayment(499, 50)" class="border p-6 rounded-3xl cursor-pointer"><h4>Starter</h4><div class="text-2xl font-bold">₹499</div><p>50 Credits</p></div>
+                <div onclick="startPayment(999, 120)" class="border-2 border-indigo-500 p-6 rounded-3xl bg-indigo-50"><h4>Pro</h4><div class="text-2xl font-bold">₹999</div><p>120 Credits</p></div>
             </div>
         </div>
     </div>
 
-    <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center z-50"><div class="bg-white p-10 rounded-3xl text-center"><div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div><p>AI is working...</p></div></div>
+    <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center z-50"><div class="bg-white p-10 rounded-3xl text-center"><div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div><h2 class="text-xl font-bold">AI is Working...</h2></div></div>
 
     <div id="successModal" class="fixed inset-0 bg-slate-900/90 hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl">
@@ -216,6 +226,7 @@
                     document.getElementById('imagePreview').src = event.target.result;
                     window.originalImageUrl = event.target.result; 
                     document.getElementById('preview-container').classList.remove('hidden');
+                    if (window.currentMode === 'faceswap') document.getElementById('submitBtn').classList.remove('hidden');
                 };
                 reader.readAsDataURL(file);
             }
@@ -249,13 +260,13 @@
             document.getElementById('loadingModal').classList.remove('hidden');
 
             try {
+                // 🚀 FIX: Use correct endpoint based on mode
                 const endpoint = window.currentMode === 'faceswap' ? '/api/upload-faceswap' : '/api/upload-prompt';
                 const response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', body: formData });
                 const result = await response.json();
 
                 if (result.success) {
                     document.getElementById('resultImage').src = result.ai_image_url;
-                    
                     const beforeWrapper = document.getElementById('beforeImageWrapper');
                     const slider = document.getElementById('comparisonSlider');
                     const handle = document.getElementById('sliderHandle');
@@ -330,7 +341,7 @@
                     photos.forEach(photo => {
                         const card = document.createElement('div');
                         card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span><span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
+                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div classs="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span><span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
                         grid.appendChild(card);
                     });
                 } else {
