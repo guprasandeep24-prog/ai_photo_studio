@@ -14,6 +14,18 @@
         .category-card:hover { transform: translateY(-8px); transition: all 0.3s ease; }
         .gender-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
 
+        /* --- TEMPLATE SELECTION STYLES --- */
+        .template-option {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 4px solid transparent;
+        }
+        .template-option.active {
+            border-color: #4f46e5;
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
         /* --- COMPARISON SLIDER STYLES --- */
         .comparison-container {
             position: relative;
@@ -38,7 +50,6 @@
             object-fit: cover;
             display: block;
         }
-        /* Fix width for before image to match container */
         .before-image img {
             width: 100%; 
             height: 100%;
@@ -95,7 +106,7 @@
     <!-- Hero Section -->
     <header class="container mx-auto px-6 py-12 text-center">
         <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6">Get Professional Photos in <span class="text-indigo-600">Seconds</span></h1>
-        <p class="text-lg text-slate-600 mb-10 max-w-2xl mx-auto">Choose a category, select gender, upload your selfie, and let our AI handle the rest.</p>
+        <p class="text-lg text-slate-600 mb-10 max-w-2xl mx-auto">Choose a category, select gender, pick a style, upload your selfie, and let our AI handle the rest.</p>
     </header>
 
     <!-- Dashboard / Gallery Section -->
@@ -121,13 +132,25 @@
 
     <!-- Upload Section -->
     <section id="upload-section" class="hidden container mx-auto px-6 py-12">
-        <div class="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border-2 border-dashed border-indigo-200 text-center">
+        <div class="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border-2 border-dashed border-indigo-200 text-center">
             <button onclick="hideUploadSection()" class="float-right text-slate-400 hover:text-slate-600"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <h2 id="selected-cat-title" class="text-2xl font-bold mb-2 text-indigo-600 pt-4">Upload Photo</h2>
-            <div class="mb-8"><p class="text-slate-500 text-sm mb-3">Select Gender</p><div class="flex justify-center gap-4"><button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Man</button><button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button></div></div>
+            
+            <!-- Gender Selection -->
+            <div class="mb-6"><p class="text-slate-500 text-sm mb-3">1. Select Gender</p><div class="flex justify-center gap-4"><button onclick="selectGender('man')" id="btn-man" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Man</button><button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-28 py-2 border-2 border-slate-200 rounded-xl font-bold hover:border-indigo-500 transition">Woman</button></div></div>
+
+            <!-- Template Selection (NEW) -->
+            <div id="template-selection-container" class="hidden mb-8">
+                <p class="text-slate-500 text-sm mb-3">2. Select Style/Template</p>
+                <div id="template-list" class="grid grid-cols-5 gap-2">
+                    <!-- Templates will be injected here by JS -->
+                </div>
+            </div>
+
             <input type="file" id="imageInput" class="hidden" accept="image/*">
             <div id="preview-container" class="hidden mb-6"><img id="imagePreview" class="w-40 h-40 object-cover mx-auto rounded-2xl border-4 border-indigo-50 shadow-lg"></div>
-            <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition mb-4"><i class="fa-solid fa-image mr-2"></i> Choose Image</button>
+            
+            <button onclick="document.getElementById('imageInput').click()" class="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200 transition mb-4"><i class="fa-solid fa-image mr-2"></i> 3. Choose Your Selfie</button>
             <button id="submitBtn" class="hidden w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">Generate My Photo <i class="fa-solid fa-magic ml-2"></i></button>
         </div>
     </section>
@@ -213,7 +236,14 @@
         const auth = getAuth(app);
         const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
-        window.selectedCategory = ""; window.selectedGender = ""; window.selectedFile = null; window.originalImageUrl = ""; window.isLoginMode = true;
+        // Global State
+        window.selectedCategory = ""; 
+        window.selectedGender = ""; 
+        window.selectedFile = null; 
+        window.originalImageUrl = ""; 
+        window.isLoginMode = true;
+        window.selectedTemplateIndex = null; // To store chosen template index
+        window.allTemplates = {}; // To store templates from backend
 
         // Auth & Nav Functions
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
@@ -252,27 +282,76 @@
 
         window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
+        // --- TEMPLATE LOGIC ---
+        async function fetchTemplatesFromServer() {
+            try {
+                const res = await fetch(`${BASE_URL}/templates`);
+                window.allTemplates = await res.json();
+                console.log("✅ Templates Loaded");
+            } catch (err) {
+                console.error("❌ Failed to fetch templates:", err);
+            }
+        }
+
+        window.displayTemplates = (category, gender) => {
+            const container = document.getElementById('template-selection-container');
+            const list = document.getElementById('template-list');
+            list.innerHTML = ""; // Clear old
+            
+            const selectedList = window.allTemplates[category][gender];
+            
+            if (selectedList && selectedList.length > 0) {
+                container.classList.remove('hidden');
+                selectedList.forEach((url, index) => {
+                    const imgDiv = document.createElement('div');
+                    imgDiv.className = `template-option rounded-xl overflow-hidden aspect-square bg-gray-200 ${window.selectedTemplateIndex === index ? 'active' : ''}`;
+                    imgDiv.innerHTML = `<img src="${url}" class="w-full h-full object-cover" loading="lazy">`;
+                    imgDiv.onclick = () => selectTemplate(index);
+                    list.appendChild(imgDiv);
+                });
+            } else {
+                container.classList.add('hidden');
+            }
+        };
+
+        window.selectTemplate = (index) => {
+            window.selectedTemplateIndex = index;
+            // Update UI selection
+            const options = document.querySelectorAll('.template-option');
+            options.forEach((opt, i) => {
+                if(i === index) opt.classList.add('active');
+                else opt.classList.remove('active');
+            });
+        };
+
         window.selectCategory = (cat) => {
-            window.selectedCategory = cat; window.selectedGender = "";
+            window.selectedCategory = cat; window.selectedGender = ""; window.selectedTemplateIndex = null;
             document.getElementById('btn-man').classList.remove('active');
             document.getElementById('btn-woman').classList.remove('active');
+            document.getElementById('template-selection-container').classList.add('hidden');
             document.getElementById('upload-section').classList.remove('hidden');
             document.getElementById('categories-section').classList.add('hidden');
             document.getElementById('dashboard-section').classList.add('hidden');
             document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
+            fetchTemplatesFromServer(); // Load templates in background
         };
 
         window.selectGender = (gender) => {
-            window.selectedGender = gender;
+            window.selectedGender = gender; window.selectedTemplateIndex = null;
             document.getElementById('btn-man').classList.toggle('active', gender === 'man');
             document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
+            
+            // Show templates after gender is picked
+            if (window.allTemplates[window.selectedCategory]) {
+                window.displayTemplates(window.selectedCategory, gender);
+            }
         };
 
         window.showUploadSection = () => {
             document.getElementById('categories-section').classList.remove('hidden');
             document.getElementById('dashboard-section').classList.add('hidden');
             document.getElementById('upload-section').classList.add('hidden');
-            window.selectedCategory = ""; window.selectedGender = "";
+            window.selectedCategory = ""; window.selectedGender = ""; window.selectedTemplateIndex = null;
         };
 
         window.hideUploadSection = () => {
@@ -342,7 +421,7 @@
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     document.getElementById('imagePreview').src = event.target.result;
-                    window.originalImageUrl = event.target.result; // Store for slider
+                    window.originalImageUrl = event.target.result; 
                     document.getElementById('preview-container').classList.remove('hidden');
                     document.getElementById('submitBtn').classList.remove('hidden');
                 };
@@ -355,6 +434,7 @@
             if (!user) return alert("Please Login first!");
             if (!window.selectedCategory) return alert("Please select a Category!");
             if (!window.selectedGender) return alert("Please select Gender!");
+            if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
             if (!window.selectedFile) return alert("Please select an image!");
 
             const formData = new FormData();
@@ -362,6 +442,7 @@
             formData.append('email', user.email);
             formData.append('category', window.selectedCategory);
             formData.append('gender', window.selectedGender);
+            formData.append('templateIndex', window.selectedTemplateIndex); // SENDING THE INDEX
             formData.append('image', window.selectedFile);
 
             document.getElementById('loadingModal').classList.remove('hidden');
@@ -371,12 +452,11 @@
                 const result = await response.json();
                 if (result.success) {
                     document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = window.originalImageUrl; // Set for slider
+                    document.getElementById('originalImagePreview').src = window.originalImageUrl; 
                     document.getElementById('downloadBtn').href = result.ai_image_url;
                     document.getElementById('successModal').classList.remove('hidden');
                     document.getElementById('loadingModal').classList.add('hidden');
                     
-                    // Initialize Slider Logic
                     const slider = document.getElementById('comparisonSlider');
                     const beforeWrapper = document.getElementById('beforeImageWrapper');
                     const handle = document.getElementById('sliderHandle');
@@ -410,7 +490,7 @@
                 if (!data.success) throw new Error(data.error);
 
                 const options = {
-                    key: "rzp_test_T0igS1UI99gp4v", // 👈 REPLACE THIS WITH YOUR ACTUAL KEY ID
+                    key: "rzp_test_T0igS1UI99gp4v", 
                     amount: amount * 100,
                     currency: "INR",
                     name: "AI Photo Studio",

@@ -35,6 +35,58 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// --- TEMPLATES CONFIGURATION (Update these with your REAL Cloudinary URLs) ---
+const TEMPLATES = {
+    'linkedin': { 
+        'man': [
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/man_1.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/man_2.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/man_3.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/man_4.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/man_5.jpg'
+        ], 
+        'woman': [
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/woman_1.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/woman_2.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/woman_3.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/woman_4.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/linkedin/woman_5.jpg'
+        ] 
+    },
+    'wedding': { 
+        'man': [
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/man_1.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/man_2.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/man_3.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/man_4.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/man_5.jpg'
+        ], 
+        'woman': [
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/woman_1.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/woman_2.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/woman_3.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/woman_4.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/wedding/woman_5.jpg'
+        ] 
+    },
+    'fashion': { 
+        'man': [
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/man_1.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/man_2.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/man_3.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/man_4.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/man_5.jpg'
+        ], 
+        'woman': [
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/woman_1.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/woman_2.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/woman_3.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/woman_4.jpg',
+            'https://res.cloudinary.com/your_name/image/upload/v1/fashion/woman_5.jpg'
+        ] 
+    }
+};
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -45,17 +97,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-const TEMPLATES = {
-    'linkedin': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928122/smiling-businessman-with-arms-crossed_dalfak.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781527213/linkdin_ceo_woman1_p0hoc3.jpg' },
-    'wedding': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1780928082/Wedding_qq5pyd.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231450/pexels-creative-studio-830123672-19376431_mancpc.jpg' },
-    'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
-};
-
-// --- AI CORE LOGIC (Face-Swap Only) ---
-async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
-    const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
+// --- AI CORE LOGIC ---
+async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
-
     try {
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
@@ -94,7 +138,12 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
 
 // --- ROUTES ---
 
-app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend (Face-Swap Mode) is LIVE!"));
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend (Multi-Template Mode) is LIVE!"));
+
+// 🚀 NEW ROUTE: Get all templates for frontend
+app.get('/templates', (req, res) => {
+    res.json(TEMPLATES);
+});
 
 app.post('/register', async (req, res) => {
     try {
@@ -126,30 +175,41 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// 🚀 UPDATED: Upload Route (Face-Swap Only)
+// 🚀 UPDATED: Upload Route (Handles Template Selection)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
-        const { userId, email, category, gender } = req.body;
+        const { userId, email, category, gender, templateIndex } = req.body;
         
         // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
-        if (!category || !gender) return res.status(400).json({ success: false, error: "Category and Gender are required" });
+        if (!category || !gender || templateIndex === undefined) {
+            return res.status(400).json({ success: false, error: "Category, Gender, and Template are required" });
+        }
 
-        // 2. Upload original image to Cloudinary
+        // 2. Pick the correct template URL using the index
+        const selectedTemplates = TEMPLATES[category][gender];
+        const idx = parseInt(templateIndex);
+
+        if (!selectedTemplates || idx < 0 || idx >= selectedTemplates.length) {
+            return res.status(400).json({ success: false, error: "Invalid Template Selected" });
+        }
+        const targetImageUrl = selectedTemplates[idx];
+
+        // 3. Upload original image to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
 
-        // 3. Run Face-Swap AI
-        const aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
+        // 4. Run Face-Swap AI
+        const aiImageUrl = await runAIFaceSwap(originalImageUrl, targetImageUrl);
 
-        // 4. Deduct Credit
+        // 5. Deduct Credit
         user.credits -= 1;
         await user.save();
 
-        // 5. Save Order
+        // 6. Save Order
         const newOrder = new Order({
             userId: userId,
             email: email,
@@ -161,10 +221,10 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         });
         await newOrder.save();
 
-        // 6. Cleanup local file
+        // 7. Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
 
-        // 7. Send Response
+        // 8. Send Response
         res.json({ 
             success: true, 
             ai_image_url: aiImageUrl, 
