@@ -14,16 +14,15 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// --- 1. MIDDLEWARE ---
 app.use(cors({
     origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 2. INIT ---
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
@@ -52,25 +51,44 @@ const TEMPLATES = {
     'fashion': { 'man': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781238420/man_fashion_image_repevi.jpg', 'woman': 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1781231824/indian_woman_fashion_ckkwlf.jpg' }
 };
 
-// 🛠️ HELPER: Extract URL from any Replicate output (String, Array, or Object)
+// 🛠️ SUPER-SMART URL EXTRACTOR
 function extractUrl(output) {
     if (!output) return "";
-    if (typeof output === 'string') return output;
+    
+    // Case 1: It's already a string
+    if (typeof output === 'string') {
+        if (output.startsWith('http')) return output;
+        // Handle potential wrapped strings
+        const match = output.match(/https?:\/\/[^\s]+/);
+        return match ? match[0] : "";
+    }
+
+    // Case 2: It's an array
     if (Array.isArray(output) && output.length > 0) {
-        const first = output[0];
-        if (typeof first === 'string') return first;
-        if (typeof first === 'object') return first.url || first.output || first.image || "";
+        return extractUrl(output[0]);
     }
+
+    // Case 3: It's an object
     if (typeof output === 'object') {
-        return output.url || output.output || output.image || "";
+        // Check all common keys Replicate uses
+        const keys = ['url', 'output', 'image', 'secure_url', 'href'];
+        for (let key of keys) {
+            if (output[key] && typeof output[key] === 'string' && output[key].startsWith('http')) {
+                return output[key];
+            }
+        }
+        // If it's an object with a data array
+        if (output.data && Array.isArray(output.data) && output.data[0]) {
+            return extractUrl(output.data[0]);
+        }
     }
+
     return "";
 }
 
-// --- 3. AI CORE LOGIC (Your Original Strategies) ---
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
-    console.log("🤖 [AI] Starting Replicate Face-Swap...");
+    console.log("🤖 [AI] Starting Face-Swap...");
 
     try {
         const output = await replicate.run(
@@ -78,12 +96,11 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
-        // Use our helper to parse the output
         let finalUrl = extractUrl(output);
 
-        // If it's still not a string URL, try Stream Strategy
+        // If direct extraction fails, try Stream handling
         if (!finalUrl || !finalUrl.startsWith('http')) {
-            console.log("🌊 [AI] Strategy 4: Attempting Stream Parsing...");
+            console.log("🌊 [AI] Trying Stream Parsing...");
             const chunks = [];
             for await (const chunk of output) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
@@ -102,18 +119,16 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             }
         }
         return finalUrl;
-
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
     }
 }
 
-// --- 4. ROUTES ---
+// --- ROUTES ---
 
-app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
+app.get('/', (req, res) => res.send("🚀 Backend is LIVE!"));
 
-// Register
 app.post('/register', async (req, res) => {
     try {
         const { email, firebaseUid } = req.body;
@@ -128,7 +143,6 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Upload & AI
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, mode, category, gender, prompt } = req.body;
@@ -148,20 +162,20 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             });
             originalImageUrl = uploadRes.secure_url;
             aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
-
         } else if (mode === 'prompt') {
             console.log("🪄 [AI] Starting Magic Prompt Mode...");
-            const output = await replicate.run(
-                "black-forest-labs/flux-schnell",
-                { input: { prompt: prompt } }
-            );
-            // 🚀 FIX: Use the helper to prevent "startsWith is not a function"
+            const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt: prompt } });
+            
+            // 🚀 DEBUGGING: This is the most important part for you to check!
+            console.log("DEBUG: Replicate Magic Prompt RAW Output:", JSON.stringify(output));
+            
             aiImageUrl = extractUrl(output);
         }
 
-        // Final Validation
+        // Final validation check
         if (!aiImageUrl || typeof aiImageUrl !== 'string' || !aiImageUrl.startsWith('http')) {
-            throw new Error("AI returned an invalid image URL. Please try again.");
+            console.error("❌ [CRITICAL] Final URL is invalid. Value was:", aiImageUrl);
+            throw new Error("AI returned an invalid image URL. Please try a different prompt.");
         }
 
         user.credits -= 1;
@@ -184,7 +198,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// Profile
 app.get('/user-profile/:userId', async (req, res) => {
     try {
         let user = await User.findOne({ firebaseUid: req.params.userId });
@@ -198,7 +211,6 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// Gallery
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
