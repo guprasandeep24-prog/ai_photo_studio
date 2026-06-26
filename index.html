@@ -49,7 +49,7 @@
         <span class="ml-4 bg-black/20 px-2 py-0.5 rounded">
             Ends in: <span id="countdown">00:00:00</span>
         </span>
-        <button class="ml-4 underline text-xs">Claim now —</button>
+        <button onclick="togglePricingModal()" class="ml-4 underline text-xs">Claim now —</button>
     </div>
 
     <!-- Navbar -->
@@ -86,7 +86,8 @@
                 <h3 class="text-xl font-bold text-white mb-4 text-center">Start taking AI photos now →</h3>
                 <div class="space-y-4">
                     <input type="email" placeholder="Type your email..." class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg shadow-indigo-500/20">Get Started <i class="fa-solid fa-arrow-right ml-2"></i></button>
+                    <button onclick="scrollToCategories()" class="w-full bg-indigo-600 ...">Get Started <i class="fa-solid fa-arrow-right ml-2"></i></button>
+
                 </div>
             </div>
         </div>
@@ -526,7 +527,11 @@
         document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
         document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
         document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
-
+        window.scrollToCategories = () => {
+    const section = document.getElementById('categories-section');
+    section.classList.remove('hidden'); // Ensure section is visible
+    section.scrollIntoView({ behavior: 'smooth' }); // Smoothly scroll karein
+};
         // TIMER FUNCTION (Corrected and placed outside)
         function startTimer(durationInSeconds) {
             let timer = durationInSeconds;
