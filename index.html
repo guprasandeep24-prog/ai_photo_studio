@@ -547,6 +547,31 @@
         document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
         document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
         document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
+    // 3. Isse apne script tag ke andar sabse niche paste karein
+function startTimer(durationInSeconds) {
+    let timer = durationInSeconds;
+    const display = document.querySelector('#timer');
+
+    setInterval(function () {
+        let hours = parseInt(timer / 3600, 10);
+        let minutes = parseInt((timer % 3600) / 60, 10);
+        let seconds = parseInt(timer % 60, 10);
+
+        hours = hours < 10 ? "0" + hours : hours;
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        display.textContent = hours + ":" + minutes + ":" + seconds;
+
+        if (--timer < 0) {
+            timer = 0;
+            display.textContent = "EXPIRED";
+        }
+    }, 1000);
+}
+
+// 24 ghante ka timer shuru karein (86400 seconds)
+startTimer(86400);
     </script>
 </body>
 </html>
