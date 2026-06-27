@@ -225,7 +225,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles Everything: String, Object, and Streams)
+// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles EVERYTHING: Strings, Objects, and Streams)
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -236,7 +236,7 @@ app.post('/magic-prompt', async (req, res) => {
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
 
-        // 2. 🌐 HINDI TO ENGLISH TRANSLATION (Ye kaam karega)
+        // 2. 🌐 HINDI TO ENGLISH TRANSLATION
         let translatedPrompt = prompt;
         try {
             const translateRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(prompt)}`);
@@ -257,41 +257,54 @@ app.post('/magic-prompt', async (req, res) => {
             { input: { prompt: translatedPrompt } }
         );
 
-        // 4. 🛠️ THE "BRUTE FORCE" EXTRACTION (Isse Error Nahi Aayega)
-        let finalImageUrl = "";
+        // 4. 🛠️ THE "UNSTOPPABLE" EXTRACTION (Fixed error logic)
+        let extractedUrl = "";
 
         if (typeof output === 'string' && output.startsWith('http')) {
-            // CASE A: Seedha URL hai
-            finalImageUrl = output;
+            extractedUrl = output;
         } 
         else if (Array.isArray(output) && output.length > 0) {
-            // CASE B: Array hai (chahe usme string ho ya object)
-            const firstItem = output[0];
-            finalImageUrl = (typeof firstItem === 'string') ? firstItem : (firstItem?.url || firstItem?.href || "");
+            const item = output[0];
+            extractedUrl = (typeof item === 'string') ? item : (item?.url || item?.href || "");
         } 
         else if (output && typeof output === 'object') {
-            // CASE C: Normal Object hai
-            finalImageUrl = output.url || output.href || output.output || "";
+            extractedUrl = output.url || output.href || output.output || "";
         }
-        // CASE D: Agar ye stream hai toh use JSON/String mein badalne ki koshish karein
-        else {
-            console.log("⚠️ Unrecognized format, attempting emergency fallback...");
-            // Agar upar wale sab fail ho jayein, toh error dein
+        else if (output && typeof output[Symbol.asyncIterator] === 'function') {
+            // Handle Stream
+            const chunks = [];
+            for await (const chunk of output) {
+                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            const buffer = Buffer.concat(chunks);
+            const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
+                    if (error) reject(error); else resolve(result);
+                }).end(buffer);
+            });
+            extractedUrl = uploadResult.secure_url;
         }
 
-        // Final validation of extracted URL
+        // 🔥 CRITICAL STEP: Force convert to string and trim whitespace
+        // Yeh line error ko hameske ke liye khatam kar degi
+        const finalImageUrl = String(extractedUrl).trim();
+
+        // 5. Final Validation
         if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Failed to extract URL. Output was:", output);
+            console.error("❌ [MAGIC PROMPT] Failed extraction. Raw Output Type:", typeof output, "Content:", output);
             throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
-        console.log("✅ [MAGIC PROMPT] Success! URL:", finalImageUrl);
+        console.log("✅ [MAGIC PROMPT] Success! Final URL:", finalImageUrl);
 
-        // 5. Upload to Cloudinary (Taki permanent link mil sake)
-        const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
-        const permanentUrl = uploadResult.secure_url;
+        // 6. Permanent Storage on Cloudinary
+        let permanentUrl = finalImageUrl;
+        if (!finalImageUrl.includes('cloudinary.com')) {
+            const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
+            permanentUrl = uploadResult.secure_url;
+        }
 
-        // 6. Deduct Credit & Save Order
+        // 7. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
