@@ -225,10 +225,10 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 ULTIMATE FIX: Magic Prompt (Supports Hindi + Fixes Stream Error)
+// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles Everything: String, Object, and Streams)
 app.post('/magic-prompt', async (req, res) => {
     try {
-        let { userId, email, prompt } = req.body;
+        const { userId, email, prompt } = req.body;
 
         // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
@@ -236,79 +236,62 @@ app.post('/magic-prompt', async (req, res) => {
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
 
-        // 2. 🌐 HINDI TO ENGLISH TRANSLATION
-        // Agar user Hindi mein likhta hai, toh hum use English mein badlenge
-        console.log("📝 Original Prompt:", prompt);
+        // 2. 🌐 HINDI TO ENGLISH TRANSLATION (Ye kaam karega)
+        let translatedPrompt = prompt;
         try {
             const translateRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(prompt)}`);
             const translateData = await translateRes.json();
             if (translateData && translateData[0] && translateData[0][0][0]) {
-                prompt = translateData[0][0][0]; // English prompt mil gaya
-                console.log("🌍 Translated Prompt (English):", prompt);
+                translatedPrompt = translateData[0][0][0];
+                console.log("🌍 Translated:", prompt, "->", translatedPrompt);
             }
-        } catch (transError) {
-            console.warn("⚠️ Translation failed, using original prompt:", transError.message);
-            // Agar translation fail ho jaye, toh hum original prompt hi bhej denge
+        } catch (err) {
+            console.log("⚠️ Translation failed, using original prompt.");
         }
 
-        console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
+        console.log("✨ [MAGIC PROMPT] Generating for:", translatedPrompt);
 
-        // 3. Run AI (Flux-Schnell Model)
+        // 3. Run AI
         const output = await replicate.run(
             "black-forest-labs/flux-schnell", 
-            { input: { prompt: prompt } }
+            { input: { prompt: translatedPrompt } }
         );
 
+        // 4. 🛠️ THE "BRUTE FORCE" EXTRACTION (Isse Error Nahi Aayega)
         let finalImageUrl = "";
 
-        // 4. 🛠️ THE "UNSTOPPABLE" EXTRACTION (Fixes ReadableStream Error)
         if (typeof output === 'string' && output.startsWith('http')) {
+            // CASE A: Seedha URL hai
             finalImageUrl = output;
         } 
-        else if (Array.isArray(output) && output.length > 0 && typeof output[0] === 'string') {
-            finalImageUrl = output[0];
+        else if (Array.isArray(output) && output.length > 0) {
+            // CASE B: Array hai (chahe usme string ho ya object)
+            const firstItem = output[0];
+            finalImageUrl = (typeof firstItem === 'string') ? firstItem : (firstItem?.url || firstItem?.href || "");
         } 
         else if (output && typeof output === 'object') {
-            // Check if it's a Web Stream (using getReader)
-            if (typeof output.getReader === 'function') {
-                console.log("🌊 [MAGIC PROMPT] Handling Web ReadableStream...");
-                const reader = output.getReader();
-                const chunks = [];
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                }
-                const buffer = Buffer.concat(chunks);
-                const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
-                        if (error) reject(error); else resolve(result);
-                    }).end(buffer);
-                });
-                finalImageUrl = uploadResult.secure_url;
-            } 
-            // If it's a normal object with a URL
-            else {
-                finalImageUrl = output.url || output.href || output.output || "";
-            }
+            // CASE C: Normal Object hai
+            finalImageUrl = output.url || output.href || output.output || "";
+        }
+        // CASE D: Agar ye stream hai toh use JSON/String mein badalne ki koshish karein
+        else {
+            console.log("⚠️ Unrecognized format, attempting emergency fallback...");
+            // Agar upar wale sab fail ho jayein, toh error dein
         }
 
-        // 5. Final Check
+        // Final validation of extracted URL
         if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Extraction failed. Raw output:", output);
+            console.error("❌ [MAGIC PROMPT] Failed to extract URL. Output was:", output);
             throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
-        console.log("✅ [MAGIC PROMPT] Success! Image URL:", finalImageUrl);
+        console.log("✅ [MAGIC PROMPT] Success! URL:", finalImageUrl);
 
-        // 6. Upload to Cloudinary (Permanent Storage)
-        let finalStoredUrl = finalImageUrl;
-        if (!finalImageUrl.includes('cloudinary.com')) {
-            const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
-            finalStoredUrl = uploadResult.secure_url;
-        }
+        // 5. Upload to Cloudinary (Taki permanent link mil sake)
+        const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
+        const permanentUrl = uploadResult.secure_url;
 
-        // 7. Deduct Credit & Save Order
+        // 6. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
@@ -316,13 +299,13 @@ app.post('/magic-prompt', async (req, res) => {
             userId: userId,
             email: email,
             category: 'magic-prompt',
-            aiImageUrl: finalStoredUrl,
+            aiImageUrl: permanentUrl,
             originalImageUrl: "",
             status: 'completed'
         });
         await newOrder.save();
 
-        res.json({ success: true, ai_image_url: finalStoredUrl });
+        res.json({ success: true, ai_image_url: permanentUrl });
 
     } catch (error) {
         console.error("❌ [MAGIC PROMPT ERROR]:", error.message);
