@@ -225,7 +225,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 FULLY FIXED: Magic Prompt Route (Handles Strings, Objects, AND Streams)
+// 🚀 ULTIMATE FIX: Magic Prompt Route (Handles Web ReadableStream perfectly)
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -246,29 +246,36 @@ app.post('/magic-prompt', async (req, res) => {
 
         let finalImageUrl = "";
 
-        // --- 🛠️ THE FIX: ADVANCED EXTRACTION LOGIC ---
-
-        // CASE A: Agar seedha URL (String) hai
+        // 3. 🛠️ ADVANCED EXTRACTION LOGIC (The "Unstoppable" Version)
+        
         if (typeof output === 'string' && output.startsWith('http')) {
+            // CASE A: Seedha URL hai
             finalImageUrl = output;
         } 
-        // CASE B: Agar Array hai (e.://...)
         else if (Array.isArray(output) && output.length > 0 && typeof output[0] === 'string') {
+            // CASE B: Array hai
             finalImageUrl = output[0];
-        }
-        // CASE C: Agar Object hai (e.g. {url: "..."})
-        else if (output && typeof output === 'object' && !typeof output[Symbol.asyncIterator] === 'function') {
+        } 
+        else if (output && typeof output === 'object' && !(output instanceof ReadableStream)) {
+            // CASE C: Normal Object hai (e.g. {url: "..."})
             finalImageUrl = output.url || output.href || output.output || "";
         }
-        // CASE D: AGAR STREAM HAI (Yahi problem kar raha tha!)
-        else if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            console.log("🌊 [MAGIC PROMPT] Detected Stream, processing chunks...");
-            const chunks = [];
-            for await (const chunk of output) {
-                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-            }
-            const buffer = Buffer.concat(chunks);
+        // CASE D: Web ReadableStream hai (Jo aapka error de raha tha)
+        else if (output && typeof output === 'object' && typeof output.getReader === 'function') {
+            console.log("🌊 [MAGIC PROMPT] Detected Web ReadableStream. Reading chunks...");
             
+            const reader = output.getReader();
+            const chunks = [];
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+            }
+
+            const buffer = Buffer.concat(chunks);
+            console.log(`✅ [MAGIC PROMPT] Stream complete. Buffer size: ${buffer.length} bytes`);
+
             // Stream ko Cloudinary par upload karein
             const uploadResult = await new Promise((resolve, reject) => {
                 cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
@@ -278,23 +285,22 @@ app.post('/magic-prompt', async (req, res) => {
             finalImageUrl = uploadResult.secure_url;
         }
 
-        // 3. Final Check: Kya humein valid URL mila?
+        // 4. Final Check: Kya URL mila?
         if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Extraction failed. Output was:", output);
+            console.error("❌ [MAGIC PROMPT] Extraction failed. Raw output was:", output);
             throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
-        console.log("✅ [MAGIC PROMPT] Success! Image URL:", finalImageUrl);
+        console.log("✅ [MAGIC PROMPT] Success! Final URL:", finalImageUrl);
 
-        // 4. Agar URL seedha nahi mila (Stream case mein), toh use Cloudinary mein save karein
-        // (Agar pehle se Cloudinary ka URL hai toh dubara upload nahi hoga)
+        // 5. Cloudinary Sync (Agar URL direct hai toh use bhi Cloudinary mein save karein)
         let finalStoredUrl = finalImageUrl;
         if (!finalImageUrl.includes('cloudinary.com')) {
             const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
             finalStoredUrl = uploadResult.secure_url;
         }
 
-        // 5. Deduct Credit & Save Order
+        // 6. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
