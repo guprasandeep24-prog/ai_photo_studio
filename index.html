@@ -512,47 +512,77 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
         });
 
         document.getElementById('submitBtn').addEventListener('click', async function() {
-            const user = auth.currentUser;
-            if (!user) return alert("Please Login first!");
-            if (!window.selectedCategory) return alert("Please select a Category!");
-            if (!window.selectedGender) return alert("Please select Gender!");
-            if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
-            if (!window.selectedFile) return alert("Please select an image!");
+    const user = auth.currentUser;
+    if (!user) return alert("Please Login first!");
+    if (!window.selectedCategory) return alert("Please select a Category!");
+    
+    // Check karein: Agar Face-swap hai toh Gender chahiye, agar Magic Prompt hai toh Template chahiye
+    if (window.selectedCategory !== 'magic-prompt') {
+        if (!window.selectedGender) return alert("Please select Gender!");
+    } else {
+        if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
+    }
+    
+    if (!window.selectedFile && window.selectedCategory !== 'magic-prompt') return alert("Please select an image!");
 
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('email', user.email);
-            formData.append('category', window.selectedCategory);
-            formData.append('gender', window.selectedGender);
-            formData.append('templateIndex', window.selectedTemplateIndex);
-            formData.append('image', window.selectedFile);
+    const formData = new FormData();
+    formData.append('userId', user.uid);
+    formData.append('email', user.email);
+    formData.append('category', window.selectedCategory);
+    formData.append('gender', window.selectedGender || ""); // Magic prompt ke liye empty string
+    formData.append('templateIndex', window.selectedTemplateIndex !== null ? window.selectedTemplateIndex : "");
+    formData.append('image', window.selectedFile);
 
-            document.getElementById('loadingModal').classList.remove('hidden');
+    document.getElementById('loadingModal').classList.remove('hidden');
 
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = window.originalImageUrl; 
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    const slider = document.getElementById('comparisonSlider');
-                    const beforeWrapper = document.getElementById('beforeImageWrapper');
-                    const handle = document.getElementById('sliderHandle');
-                    slider.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        beforeWrapper.style.width = `${val}%`;
-                        handle.style.left = `${val}%`;
-                    });
-                } else { throw new Error(result.error || "AI Generation failed"); }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
+    try {
+        // Decide API endpoint: magic-prompt ya upload
+        const endpoint = window.selectedCategory === 'magic-prompt' ? '/magic-prompt' : '/upload';
+        
+        const response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', body: formData });
+        const result = await response.json();
+
+        if (result.success) {
+            document.getElementById('resultImage').src = result.ai_image_url;
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+            
+            // --- 🌟 SMART SLIDER LOGIC 🌟 ---
+            const slider = document.getElementById('comparisonSlider');
+            const beforeWrapper = document.getElementById('beforeImageWrapper');
+            const handle = document.getElementById('sliderHandle');
+
+            if (window.selectedCategory === 'magic-prompt') {
+                // 1. Agar Magic Prompt hai: Slider aur Before-image ko HIDE kar do
+                beforeWrapper.classList.add('hidden');
+                handle.classList.add('hidden');
+                slider.classList.add('hidden');
+                console.log("✨ Magic Prompt mode: Slider hidden.");
+            } else {
+                // 2. Agar Face-Swap hai: Slider aur Before-image ko SHOW karo
+                beforeWrapper.classList.remove('hidden');
+                handle.classList.remove('hidden');
+                slider.classList.remove('hidden');
+                document.getElementById('originalImagePreview').src = window.originalImageUrl;
+                
+                // Slider event listener initialize karein
+                slider.oninput = (e) => {
+                    const val = e.target.value;
+                    beforeWrapper.style.width = `${val}%`;
+                    handle.style.left = `${val}%`;
+                };
+                console.log("🔄 Face-Swap mode: Slider enabled.");
             }
-        });
+
+        } else {
+            throw new Error(result.error || "AI Generation failed");
+        }
+    } catch (error) {
+        alert("❌ Error: " + error.message);
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+});
 
         // --- RAZORPAY ---
         window.startPayment = async (amount, credits) => {
