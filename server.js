@@ -225,10 +225,10 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 ULTIMATE FIX: Magic Prompt Route (Handles Web ReadableStream perfectly)
+// 🚀 ULTIMATE FIX: Magic Prompt (Supports Hindi + Fixes Stream Error)
 app.post('/magic-prompt', async (req, res) => {
     try {
-        const { userId, email, prompt } = req.body;
+        let { userId, email, prompt } = req.body;
 
         // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
@@ -236,9 +236,24 @@ app.post('/magic-prompt', async (req, res) => {
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
 
+        // 2. 🌐 HINDI TO ENGLISH TRANSLATION
+        // Agar user Hindi mein likhta hai, toh hum use English mein badlenge
+        console.log("📝 Original Prompt:", prompt);
+        try {
+            const translateRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(prompt)}`);
+            const translateData = await translateRes.json();
+            if (translateData && translateData[0] && translateData[0][0][0]) {
+                prompt = translateData[0][0][0]; // English prompt mil gaya
+                console.log("🌍 Translated Prompt (English):", prompt);
+            }
+        } catch (transError) {
+            console.warn("⚠️ Translation failed, using original prompt:", transError.message);
+            // Agar translation fail ho jaye, toh hum original prompt hi bhej denge
+        }
+
         console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
 
-        // 2. Run AI (Flux-Schnell Model)
+        // 3. Run AI (Flux-Schnell Model)
         const output = await replicate.run(
             "black-forest-labs/flux-schnell", 
             { input: { prompt: prompt } }
@@ -246,61 +261,54 @@ app.post('/magic-prompt', async (req, res) => {
 
         let finalImageUrl = "";
 
-        // 3. 🛠️ ADVANCED EXTRACTION LOGIC (The "Unstoppable" Version)
-        
+        // 4. 🛠️ THE "UNSTOPPABLE" EXTRACTION (Fixes ReadableStream Error)
         if (typeof output === 'string' && output.startsWith('http')) {
-            // CASE A: Seedha URL hai
             finalImageUrl = output;
         } 
         else if (Array.isArray(output) && output.length > 0 && typeof output[0] === 'string') {
-            // CASE B: Array hai
             finalImageUrl = output[0];
         } 
-        else if (output && typeof output === 'object' && !(output instanceof ReadableStream)) {
-            // CASE C: Normal Object hai (e.g. {url: "..."})
-            finalImageUrl = output.url || output.href || output.output || "";
-        }
-        // CASE D: Web ReadableStream hai (Jo aapka error de raha tha)
-        else if (output && typeof output === 'object' && typeof output.getReader === 'function') {
-            console.log("🌊 [MAGIC PROMPT] Detected Web ReadableStream. Reading chunks...");
-            
-            const reader = output.getReader();
-            const chunks = [];
-            
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
+        else if (output && typeof output === 'object') {
+            // Check if it's a Web Stream (using getReader)
+            if (typeof output.getReader === 'function') {
+                console.log("🌊 [MAGIC PROMPT] Handling Web ReadableStream...");
+                const reader = output.getReader();
+                const chunks = [];
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                }
+                const buffer = Buffer.concat(chunks);
+                const uploadResult = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
+                        if (error) reject(error); else resolve(result);
+                    }).end(buffer);
+                });
+                finalImageUrl = uploadResult.secure_url;
+            } 
+            // If it's a normal object with a URL
+            else {
+                finalImageUrl = output.url || output.href || output.output || "";
             }
-
-            const buffer = Buffer.concat(chunks);
-            console.log(`✅ [MAGIC PROMPT] Stream complete. Buffer size: ${buffer.length} bytes`);
-
-            // Stream ko Cloudinary par upload karein
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
-                    if (error) reject(error); else resolve(result);
-                }).end(buffer);
-            });
-            finalImageUrl = uploadResult.secure_url;
         }
 
-        // 4. Final Check: Kya URL mila?
+        // 5. Final Check
         if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Extraction failed. Raw output was:", output);
+            console.error("❌ [MAGIC PROMPT] Extraction failed. Raw output:", output);
             throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
-        console.log("✅ [MAGIC PROMPT] Success! Final URL:", finalImageUrl);
+        console.log("✅ [MAGIC PROMPT] Success! Image URL:", finalImageUrl);
 
-        // 5. Cloudinary Sync (Agar URL direct hai toh use bhi Cloudinary mein save karein)
+        // 6. Upload to Cloudinary (Permanent Storage)
         let finalStoredUrl = finalImageUrl;
         if (!finalImageUrl.includes('cloudinary.com')) {
             const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
             finalStoredUrl = uploadResult.secure_url;
         }
 
-        // 6. Deduct Credit & Save Order
+        // 7. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
