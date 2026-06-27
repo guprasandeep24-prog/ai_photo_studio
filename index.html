@@ -123,6 +123,32 @@
                 <h3 class="text-2xl font-bold mb-2">Fashion</h3><p class="text-slate-400">Stylish Look</p>
             </div>
         </div>
+        <!-- Row 2: MAGIC PROMPT BOX (Wedding ke niche, full width) -->
+    <div class="grid grid-cols-1">
+        <div onclick="openMagicPrompt()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-indigo-500/30 hover:border-indigo-500 transition">
+            <div class="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-1 text-white">✨ Magic Prompt Mode</h3>
+            <p class="text-slate-400 text-sm">Type anything and let AI create it from scratch!</p>
+        </div>
+    </div>
+</section>
+
+<!-- NEW: Magic Prompt Modal (Prompt likhne ke liye popup) -->
+<div id="magicPromptModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[150] p-4">
+    <div class="glass p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center border border-white/20">
+        <button onclick="closeMagicPrompt()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <h2 class="text-3xl font-bold mb-2 text-indigo-400 pt-4">Magic Prompt</h2>
+        <p class="text-slate-400 mb-6">Describe your dream image in detail...</p>
+        
+        <textarea id="promptInput" rows="4" class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6" placeholder="e.g. A majestic lion wearing a crown in a neon cyberpunk city..."></textarea>
+        
+        <button id="magicSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">
+            Generate Magic ✨
+        </button>
+    </div>
+</div>
     </section>
 
     <!-- Upload Section -->
@@ -251,7 +277,57 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
+        // 1. Magic Prompt Modal ko kholne aur band karne ke liye
+window.openMagicPrompt = () => {
+    document.getElementById('magicPromptModal').classList.remove('hidden');
+};
 
+window.closeMagicPrompt = () => {
+    document.getElementById('magicPromptModal').classList.add('hidden');
+    document.getElementById('promptInput').value = ""; // Clear input
+};
+
+// 2. Magic Prompt Submit karne ka logic
+document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
+    const user = auth.currentUser;
+    const promptText = document.getElementById('promptInput').value.trim();
+
+    if (!user) return alert("Please Login first!");
+    if (!promptText) return alert("Please enter a prompt!");
+
+    // Loading dikhayein
+    document.getElementById('loadingModal').classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${BASE_URL}/magic-prompt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.uid,
+                email: user.email,
+                prompt: promptText
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Success! Image dikhayein
+            document.getElementById('resultImage').src = result.ai_image_url;
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            
+            // Modal band karein aur Success dikhayein
+            closeMagicPrompt();
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+        } else {
+            throw new Error(result.error || "Generation failed");
+        }
+    } catch (error) {
+        alert("❌ Error: " + error.message);
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+});
         // Global State
         window.selectedCategory = ""; 
         window.selectedGender = ""; 

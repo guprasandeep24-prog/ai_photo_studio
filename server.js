@@ -237,7 +237,52 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+// 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
+app.post('/magic-prompt', async (req, res) => {
+    try {
+        const { userId, email, prompt } = req.body;
 
+        // 1. Validation
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
+
+        console.log("✨ [MAGIC PROMPT] Generating for:", prompt);
+
+        // 2. Run AI (Flux-Schnell Model)
+        const output = await replicate.run(
+            "black-forest-labs/flux-schnell", 
+            { input: { prompt: prompt } }
+        );
+
+        // 3. Get Image URL
+        let aiImageUrl = Array.isArray(output) ? output[0] : output;
+
+        // 4. Upload to Cloudinary for permanent storage
+        const uploadResult = await cloudinary.uploader.upload(aiImageUrl, { folder: "magic_prompts" });
+        const finalImageUrl = uploadResult.secure_url;
+
+        // 5. Deduct Credit & Save Order
+        user.credits -= 1;
+        await user.save();
+
+        const newOrder = new Order({
+            userId: userId,
+            email: email,
+            category: 'magic-prompt', // Mark as magic prompt
+            aiImageUrl: finalImageUrl,
+            status: 'completed'
+        });
+        await newOrder.save();
+
+        res.json({ success: true, ai_image_url: finalImageUrl });
+
+    } catch (error) {
+        console.error("❌ [MAGIC PROMPT ERROR]:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
