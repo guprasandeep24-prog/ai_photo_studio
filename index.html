@@ -38,7 +38,20 @@
         .slider-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #4f46e5; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 20; pointer-events: none; }
         
         @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-        .float-element { animation: float 3s ease-in-out infinite; }
+        .float-element { animation: float 3s ease-in-out infinite; } 
+        /* --- MAGIC MODE FIX --- */
+
+/* Jab container mein .is-magic-mode class hogi, toh ye sab hide kar dega */
+.comparison-container.is-magic-mode .before-image,
+.comparison-container.is-magic-mode .slider-handle,
+.comparison-container.is-magic-mode .slider-input {
+    display: none !important; /* !important taaki koi aur style ise rok na sake */
+}
+
+/* Magic mode mein image ko full width karne ke liye */
+.comparison-container.is-magic-mode .after-image {
+    width: 100% !important;
+}
     </style>
 </head>
 <body class="text-slate-100">
@@ -515,14 +528,8 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
     const user = auth.currentUser;
     if (!user) return alert("Please Login first!");
     if (!window.selectedCategory) return alert("Please select a Category!");
-    
-    // Mode check logic
-    if (window.selectedCategory === 'magic-prompt') {
-        if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
-    } else {
-        if (!window.selectedGender) return alert("Please select Gender!");
-    }
-    
+    if (window.selectedCategory !== 'magic-prompt' && !window.selectedGender) return alert("Please select Gender!");
+    if (window.selectedCategory === 'magic-prompt' && window.selectedTemplateIndex === null) return alert("Please select a Style!");
     if (!window.selectedFile && window.selectedCategory !== 'magic-prompt') return alert("Please select an image!");
 
     const formData = new FormData();
@@ -536,40 +543,40 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
     document.getElementById('loadingModal').classList.remove('hidden');
 
     try {
-        // Decide endpoint
         const endpoint = window.selectedCategory === 'magic-prompt' ? '/magic-prompt' : '/upload';
-        
         const response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', body: formData });
         const result = await response.json();
 
         if (result.success) {
+            // 1. Image aur UI set karein
             document.getElementById('resultImage').src = result.ai_image_url;
             document.getElementById('originalImagePreview').src = window.originalImageUrl; 
             document.getElementById('downloadBtn').href = result.ai_image_url;
+            
+            // 2. Modal dikhayein
             document.getElementById('successModal').classList.remove('hidden');
             document.getElementById('loadingModal').classList.add('hidden');
             
-            // --- 🛠️ THE ULTIMATE SLIDER CONTROL LOGIC 🛠️ ---
+            // 3. 🌟 THE MAGIC FIX: Container ko mode ke hisaab se handle karein
+            const container = document.querySelector('.comparison-container');
             const slider = document.getElementById('comparisonSlider');
             const beforeWrapper = document.getElementById('beforeImageWrapper');
             const handle = document.getElementById('sliderHandle');
-            const afterImgContainer = document.querySelector('.after-image');
 
             if (window.selectedCategory === 'magic-prompt') {
-                // 1. MAGIC PROMPT: Slider ko poori tarah khatam kar do
-                beforeWrapper.style.display = 'none';   // Hide original image
-                handle.style.display = 'none';         // Hide handle
-                slider.style.display = 'none';         // Hide slider bar
-                afterImgContainer.style.width = '100%'; // Result image ko full width karo
-                console.log("✨ Mode: Magic Prompt (Slider Removed)");
+                // Magic mode: Slider ko poori tarah mita do
+                container.classList.add('is-magic-mode');
+                console.log("✨ Mode: Magic Prompt (Slider Kill)");
             } else {
-                // 2. FACE SWAP: Slider ko wapas set karo
-                beforeWrapper.style.display = 'block'; 
-                handle.style.display = 'flex';
-                slider.style.display = 'block';
-                afterImgContainer.style.width = '50%'; // Result image ko half width karo
+                // Face-swap mode: Slider ko wapas lao
+                container.classList.remove('is-magic-mode');
                 
-                // Slider movement logic
+                // Width aur slider reset karein
+                beforeWrapper.style.width = '50%';
+                handle.style.left = '50%';
+                slider.value = 50;
+
+                // Slider movement event listener
                 slider.oninput = (e) => {
                     const val = e.target.value;
                     beforeWrapper.style.width = `${val}%`;
@@ -577,7 +584,6 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                 };
                 console.log("🔄 Mode: Face-Swap (Slider Enabled)");
             }
-            // -------------------------------------------------
 
         } else {
             throw new Error(result.error || "AI Generation failed");
