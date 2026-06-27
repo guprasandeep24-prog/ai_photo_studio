@@ -225,7 +225,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles EVERYTHING: Strings, Objects, and Streams)
+// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles Strings, Objects, and Arrays of Streams)
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -236,75 +236,67 @@ app.post('/magic-prompt', async (req, res) => {
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
 
-        // 2. 🌐 HINDI TO ENGLISH TRANSLATION
-        let translatedPrompt = prompt;
-        try {
-            const translateRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(prompt)}`);
-            const translateData = await translateRes.json();
-            if (translateData && translateData[0] && translateData[0][0][0]) {
-                translatedPrompt = translateData[0][0][0];
-                console.log("🌍 Translated:", prompt, "->", translatedPrompt);
-            }
-        } catch (err) {
-            console.log("⚠️ Translation failed, using original prompt.");
-        }
+        console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
 
-        console.log("✨ [MAGIC PROMPT] Generating for:", translatedPrompt);
-
-        // 3. Run AI
+        // 2. Run AI
         const output = await replicate.run(
             "black-forest-labs/flux-schnell", 
-            { input: { prompt: translatedPrompt } }
+            { input: { prompt: prompt } }
         );
 
-        // 4. 🛠️ THE "UNSTOPPABLE" EXTRACTION (Fixed error logic)
-        let extractedUrl = "";
+        let finalImageUrl = "";
 
-        if (typeof output === 'string' && output.startsWith('http')) {
-            extractedUrl = output;
-        } 
-        else if (Array.isArray(output) && output.length > 0) {
-            const item = output[0];
-            extractedUrl = (typeof item === 'string') ? item : (item?.url || item?.href || "");
-        } 
-        else if (output && typeof output === 'object') {
-            extractedUrl = output.url || output.href || output.output || "";
+        // 3. 🛠️ DEEP EXTRACTION LOGIC (The Bulletproof Way)
+        
+        // Step A: Agar output Array hai, toh pehle pehle element ko nikaal lein
+        let target = output;
+        if (Array.isArray(output) && output.length > 0) {
+            target = output[0];
         }
-        else if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            // Handle Stream
+
+        // Step B: Ab 'target' ko check karein (String, Object, ya Stream)
+        if (typeof target === 'string' && target.startsWith('http')) {
+            // Case 1: Seedha URL mil gaya
+            finalImageUrl = target;
+        } 
+        else if (target && typeof target[Symbol.asyncIterator] === 'function') {
+            // Case 2: Ye ek STREAM hai (ReadableStream)
+            console.log("🌊 [MAGIC PROMPT] Detected Stream, converting to Buffer...");
             const chunks = [];
-            for await (const chunk of output) {
+            for await (const chunk of target) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
             }
             const buffer = Buffer.concat(chunks);
+
+            // Stream ko Cloudinary par upload karein
             const uploadResult = await new Promise((resolve, reject) => {
                 cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
                     if (error) reject(error); else resolve(result);
                 }).end(buffer);
             });
-            extractedUrl = uploadResult.secure_url;
+            finalImageUrl = uploadResult.secure_url;
+        } 
+        else if (target && typeof target === 'object') {
+            // Case 3: Ek normal Object hai (e.g. {url: "..."})
+            finalImageUrl = target.url || target.href || target.output || "";
         }
 
-        // 🔥 CRITICAL STEP: Force convert to string and trim whitespace
-        // Yeh line error ko hameske ke liye khatam kar degi
-        const finalImageUrl = String(extractedUrl).trim();
-
-        // 5. Final Validation
-        if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Failed extraction. Raw Output Type:", typeof output, "Content:", output);
+        // 4. Final Safety Check
+        if (!finalImageUrl || typeof finalImageUrl !== 'string' || !finalImageUrl.startsWith('http')) {
+            console.error("❌ [MAGIC PROMPT] Failed to extract URL. Target type:", typeof target, "Raw target:", target);
             throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
         console.log("✅ [MAGIC PROMPT] Success! Final URL:", finalImageUrl);
 
-        // 6. Permanent Storage on Cloudinary
+        // 5. Permanent Storage (Agar Replicate ka temporary URL hai toh use Cloudinary par upload karein)
         let permanentUrl = finalImageUrl;
         if (!finalImageUrl.includes('cloudinary.com')) {
             const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
             permanentUrl = uploadResult.secure_url;
         }
 
-        // 7. Deduct Credit & Save Order
+        // 6. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
