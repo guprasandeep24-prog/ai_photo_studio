@@ -98,38 +98,52 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- AI CORE LOGIC ---
-async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
+async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
+    const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
+
     try {
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
-        if (typeof output === 'string' && output.startsWith('http')) return output;
-        if (Array.isArray(output) && output.length > 0) return output[0];
-        if (output && typeof output === 'object') {
-            const urlFromObj = output.output || output.url || output.image;
-            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
+        // --- FIX START: Handle all Replicate output types safely ---
+        let finalUrl = "";
+
+        if (typeof output === 'string') {
+            finalUrl = output; // Agar seedha URL hai
+        } else if (Array.isArray(output) && output.length > 0) {
+            finalUrl = output[0]; // Agar array hai toh pehla element
+        } else if (output && typeof output === 'object') {
+            // Agar 'FileOutput' object hai, toh uske andar se URL nikalna
+            finalUrl = output.url || output.href || output.output || ""; 
         }
-        
-        // Stream handling
+
+        // Agar humein koi valid URL mila, toh wahi return karein
+        if (typeof finalUrl === 'string' && finalUrl.startsWith('http')) {
+            return finalUrl;
+        }
+
+        // Agar output ek Stream hai (Complex case)
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
             const chunks = [];
             for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
             const buffer = Buffer.concat(chunks);
             const contentString = buffer.toString().trim();
             if (contentString.startsWith('http')) return contentString;
-            if (buffer.length > 0) {
-                const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
-                        if (error) reject(error); else resolve(result);
-                    }).end(buffer);
-                });
-                return uploadResult.secure_url;
-            }
+            
+            const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
+                    if (error) reject(error); else resolve(result);
+                }).end(buffer);
+            });
+            return uploadResult.secure_url;
         }
-        throw new Error("AI returned unparseable format");
+
+        throw new Error("AI returned an invalid format. Could not extract URL.");
+        // --- FIX END ---
+
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
@@ -202,8 +216,22 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
 
-        // 4. Run Face-Swap AI
-        const aiImageUrl = await runAIFaceSwap(originalImageUrl, targetImageUrl);
+// ... (baaki code upar wala same rahega)
+
+        // 3. Run Face-Swap AI
+        const aiResult = await runAIFaceSwap(originalImageUrl, category, gender);
+
+        // 4. Ensure we have a clean string URL
+        let aiImageUrl = "";
+        if (typeof aiResult === 'string') {
+            aiImageUrl = aiResult;
+        } else if (aiResult && typeof aiResult === 'object') {
+            aiImageUrl = aiResult.url || aiResult.href || aiResult.output || "";
+        }
+
+        if (!aiImageUrl || !aiImageUrl.startsWith('http')) {
+            throw new Error("Failed to get a valid image URL from AI.");
+        }
 
         // 5. Deduct Credit
         user.credits -= 1;
@@ -215,11 +243,13 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             email: email,
             category: category,
             gender: gender,
-            aiImageUrl: aiImageUrl,
+            aiImageUrl: aiImageUrl, // Ab ye hamesെ string hoga
             originalImageUrl: originalImageUrl,
             status: 'completed'
         });
         await newOrder.save();
+
+        // ... (baaki code niche wala same rahega)
 
         // 7. Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
