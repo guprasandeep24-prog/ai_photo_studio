@@ -98,6 +98,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- AI CORE LOGIC ---
+// --- AI CORE LOGIC (Updated with FileOutput Fix) ---
 async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
     const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
@@ -108,41 +109,23 @@ async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
-        // --- FIX START: Handle all Replicate output types safely ---
+        // 🚀 FIX: Output ko check karke sirf String URL nikaalna
         let finalUrl = "";
 
         if (typeof output === 'string') {
-            finalUrl = output; // Agar seedha URL hai
+            finalUrl = output; // Agar seedha string hai
         } else if (Array.isArray(output) && output.length > 0) {
-            finalUrl = output[0]; // Agar array hai toh pehla element
+            finalUrl = output[0]; // Agar array hai
         } else if (output && typeof output === 'object') {
-            // Agar 'FileOutput' object hai, toh uske andar se URL nikalna
+            // AGAR FileOutput OBJECT HAI (Yahi problem kar raha tha)
             finalUrl = output.url || output.href || output.output || ""; 
         }
 
-        // Agar humein koi valid URL mila, toh wahi return karein
-        if (typeof finalUrl === 'string' && finalUrl.startsWith('http')) {
-            return finalUrl;
+        if (!finalUrl || !finalUrl.startsWith('http')) {
+            throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
-        // Agar output ek Stream hai (Complex case)
-        if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            const chunks = [];
-            for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
-            const buffer = Buffer.concat(chunks);
-            const contentString = buffer.toString().trim();
-            if (contentString.startsWith('http')) return contentString;
-            
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
-                    if (error) reject(error); else resolve(result);
-                }).end(buffer);
-            });
-            return uploadResult.secure_url;
-        }
-
-        throw new Error("AI returned an invalid format. Could not extract URL.");
-        // --- FIX END ---
+        return finalUrl; // Ab hum hamesha ek STRING return karenge
 
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
@@ -190,79 +173,53 @@ app.get('/user-profile/:userId', async (req, res) => {
 });
 
 // 🚀 UPDATED: Upload Route (Handles Template Selection)
+// 🚀 UPDATED: Upload Route (with extra safety)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
-        const { userId, email, category, gender, templateIndex } = req.body;
+        const { userId, email, category, gender } = req.body;
         
-        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
-        if (!category || !gender || templateIndex === undefined) {
-            return res.status(400).json({ success: false, error: "Category, Gender, and Template are required" });
-        }
 
-        // 2. Pick the correct template URL using the index
-        const selectedTemplates = TEMPLATES[category][gender];
-        const idx = parseInt(templateIndex);
-
-        if (!selectedTemplates || idx < 0 || idx >= selectedTemplates.length) {
-            return res.status(400).json({ success: false, error: "Invalid Template Selected" });
-        }
-        const targetImageUrl = selectedTemplates[idx];
-
-        // 3. Upload original image to Cloudinary
+        // 1. Upload original image to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
 
-// ... (baaki code upar wala same rahega)
+        // 2. Run Face-Swap AI (Ab ye hamesha STRING dega)
+        const aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
 
-        // 3. Run Face-Swap AI
-        const aiResult = await runAIFaceSwap(originalImageUrl, category, gender);
+        // 3. Extra Safety Check: Ensure aiImageUrl is a string
+        const finalAiUrl = typeof aiImageUrl === 'string' ? aiImageUrl : (aiImageUrl?.url || "");
+        if (!finalAiUrl) throw new Error("Failed to get valid AI image URL");
 
-        // 4. Ensure we have a clean string URL
-        let aiImageUrl = "";
-        if (typeof aiResult === 'string') {
-            aiImageUrl = aiResult;
-        } else if (aiResult && typeof aiResult === 'object') {
-            aiImageUrl = aiResult.url || aiResult.href || aiResult.output || "";
-        }
-
-        if (!aiImageUrl || !aiImageUrl.startsWith('http')) {
-            throw new Error("Failed to get a valid image URL from AI.");
-        }
-
-        // 5. Deduct Credit
+        // 4. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
-        // 6. Save Order
         const newOrder = new Order({
             userId: userId,
             email: email,
             category: category,
             gender: gender,
-            aiImageUrl: aiImageUrl, // Ab ye hamesെ string hoga
+            aiImageUrl: finalAiUrl, // String hi jayega
             originalImageUrl: originalImageUrl,
             status: 'completed'
         });
         await newOrder.save();
 
-        // ... (baaki code niche wala same rahega)
-
-        // 7. Cleanup local file
+        // 5. Cleanup
         if (req.file) fs.unlinkSync(req.file.path);
 
-        // 8. Send Response
         res.json({ 
             success: true, 
-            ai_image_url: aiImageUrl, 
+            ai_image_url: finalAiUrl, 
             original_image_url: originalImageUrl 
         });
 
     } catch (error) {
-        if (req.file) fs.unlinkSync(req.file.path);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         console.error("❌ [UPLOAD ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
