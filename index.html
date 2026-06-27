@@ -39,18 +39,23 @@
         
         @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
         .float-element { animation: float 3s ease-in-out infinite; } 
-        /* --- MAGIC MODE FIX --- */
+        /* 🚀 THE ULTIMATE KILLER RULE: Magic Mode active hote hi sab gayab! */
 
-/* Jab container mein .is-magic-mode class hogi, toh ye sab hide kar dega */
-.comparison-container.is-magic-mode .before-image,
-.comparison-container.is-magic-mode .slider-handle,
-.comparison-container.is-magic-mode .slider-input {
-    display: none !important; /* !important taaki koi aur style ise rok na sake */
+/* Jab successModal mein 'is-magic-mode' class hogi, tab ye sab kaam karega */
+#successModal.is-magic-mode .before-image, 
+#successModal.is-magic-mode .slider-handle, 
+#successModal.is-magic-mode .slider-input {
+    display: none !important; /* Forcefully hide */
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
-/* Magic mode mein image ko full width karne ke liye */
-.comparison-container.is-magic-mode .after-image {
+/* Magic mode mein result image ko poora dikhao */
+#successModal.is-magic-mode .after-image {
     width: 100% !important;
+    height: 100% !important;
+    clip-path: none !important; /* Agar koi clip-path laga ho toh hata dega */
 }
     </style>
 </head>
@@ -529,14 +534,13 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
     if (!user) return alert("Please Login first!");
     if (!window.selectedCategory) return alert("Please select a Category!");
     
-    // Check for mandatory fields based on mode
-    if (window.selectedCategory === 'magic-prompt') {
-        if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
-    } else {
+    // Validation logic
+    if (window.selectedCategory !== 'magic-prompt') {
         if (!window.selectedGender) return alert("Please select Gender!");
+        if (!window.selectedFile) return alert("Please select an image!");
+    } else {
+        if (window.selectedTemplateIndex === null) return alert("Please select a Style!");
     }
-    
-    if (!window.selectedFile && window.selectedCategory !== 'magic-prompt') return alert("Please select an image!");
 
     const formData = new FormData();
     formData.append('userId', user.uid);
@@ -554,42 +558,39 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
         const result = await response.json();
 
         if (result.success) {
+            // 1. Result setup
             document.getElementById('resultImage').src = result.ai_image_url;
             document.getElementById('originalImagePreview').src = window.originalImageUrl; 
             document.getElementById('downloadBtn').href = result.ai_image_url;
-            document.getElementById('successModal').classList.remove('hidden');
-            document.getElementById('loadingModal').classList.add('hidden');
             
-            // --- 💥 ULTIMATE BRUTE FORCE FIX (NO MORE SLIDER) 💥 ---
-            const slider = document.getElementById('comparisonSlider');
-            const beforeWrapper = document.getElementById('beforeImageWrapper');
-            const handle = document.getElementById('sliderHandle');
-            const afterImg = document.querySelector('.after-image');
-
+            // 2. 🌟 THE MAGIC FIX: Toggle the MASTER CLASS 🌟
+            const modal = document.getElementById('successModal');
             if (window.selectedCategory === 'magic-prompt') {
-                // 1. Sab kuch gayab kar do (Direct inline style override)
-                beforeWrapper.setAttribute('style', 'display: none !important');
-                handle.setAttribute('style', 'display: none !important');
-                slider.setAttribute('style', 'display: none !important');
-                
-                // 2. After-image ko poora khol do (Full Width)
-                afterImg.setAttribute('style', 'width: 100% !important; height: 100% !important;');
-                console.log("🚀 Magic Mode: All slider elements forcibly removed.");
+                modal.classList.add('is-magic-mode'); // MAGIC MODE ON
+                console.log("✨ Applied Magic Mode class to Modal");
             } else {
-                // Face-swap mode mein wapas set karo
-                beforeWrapper.setAttribute('style', 'display: block !important; width: 50% !important;');
-                handle.setAttribute('style', 'display: flex !important; left: 50% !important;');
-                slider.setAttribute('style', 'display: block !important; opacity: 1 !important;');
-                afterImg.setAttribute('style', 'width: 50% !important; height: 100% !important;');
-
-                // Slider move function
+                modal.classList.remove('is-magic-mode'); // FACE SWAP MODE
+                console.log("🔄 Applied Face-Swap Mode to Modal");
+                
+                // Slider setup for face-swap
+                const slider = document.getElementById('comparisonSlider');
+                const beforeWrapper = document.getElementById('beforeImageWrapper');
+                const handle = document.getElementById('sliderHandle');
+                
+                // Reset slider values
+                beforeWrapper.style.width = '50%';
+                handle.style.left = '50%';
+                slider.value = 50;
                 slider.oninput = (e) => {
                     const val = e.target.value;
                     beforeWrapper.style.width = `${val}%`;
                     handle.style.left = `${val}%`;
                 };
-                console.log("🔄 Face-Swap Mode: Slider re-enabled.");
             }
+
+            // 3. Show Modal
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
 
         } else {
             throw new Error(result.error || "AI Generation failed");
