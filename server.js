@@ -98,35 +98,38 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- AI CORE LOGIC ---
-// --- AI CORE LOGIC (Updated with FileOutput Fix) ---
-async function runAIFaceSwap(userCloudinaryUrl, category, gender) {
-    const targetImageUrl = TEMPLATES[category][gender] || TEMPLATES['linkedin']['woman'];
+async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
-
     try {
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
-        // 🚀 FIX: Output ko check karke sirf String URL nikaalna
-        let finalUrl = "";
-
-        if (typeof output === 'string') {
-            finalUrl = output; // Agar seedha string hai
-        } else if (Array.isArray(output) && output.length > 0) {
-            finalUrl = output[0]; // Agar array hai
-        } else if (output && typeof output === 'object') {
-            // AGAR FileOutput OBJECT HAI (Yahi problem kar raha tha)
-            finalUrl = output.url || output.href || output.output || ""; 
+        if (typeof output === 'string' && output.startsWith('http')) return output;
+        if (Array.isArray(output) && output.length > 0) return output[0];
+        if (output && typeof output === 'object') {
+            const urlFromObj = output.output || output.url || output.image;
+            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
         }
-
-        if (!finalUrl || !finalUrl.startsWith('http')) {
-            throw new Error("AI returned an invalid format. Could not extract URL.");
+        
+        // Stream handling
+        if (output && typeof output[Symbol.asyncIterator] === 'function') {
+            const chunks = [];
+            for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
+            const buffer = Buffer.concat(chunks);
+            const contentString = buffer.toString().trim();
+            if (contentString.startsWith('http')) return contentString;
+            if (buffer.length > 0) {
+                const uploadResult = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
+                        if (error) reject(error); else resolve(result);
+                    }).end(buffer);
+                });
+                return uploadResult.secure_url;
+            }
         }
-
-        return finalUrl; // Ab hum hamesha ek STRING return karenge
-
+        throw new Error("AI returned unparseable format");
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
@@ -173,150 +176,68 @@ app.get('/user-profile/:userId', async (req, res) => {
 });
 
 // 🚀 UPDATED: Upload Route (Handles Template Selection)
-// 🚀 UPDATED: Upload Route (with extra safety)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
-        const { userId, email, category, gender } = req.body;
+        const { userId, email, category, gender, templateIndex } = req.body;
         
+        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+        if (!category || !gender || templateIndex === undefined) {
+            return res.status(400).json({ success: false, error: "Category, Gender, and Template are required" });
+        }
 
-        // 1. Upload original image to Cloudinary
+        // 2. Pick the correct template URL using the index
+        const selectedTemplates = TEMPLATES[category][gender];
+        const idx = parseInt(templateIndex);
+
+        if (!selectedTemplates || idx < 0 || idx >= selectedTemplates.length) {
+            return res.status(400).json({ success: false, error: "Invalid Template Selected" });
+        }
+        const targetImageUrl = selectedTemplates[idx];
+
+        // 3. Upload original image to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
 
-        // 2. Run Face-Swap AI (Ab ye hamesha STRING dega)
-        const aiImageUrl = await runAIFaceSwap(originalImageUrl, category, gender);
+        // 4. Run Face-Swap AI
+        const aiImageUrl = await runAIFaceSwap(originalImageUrl, targetImageUrl);
 
-        // 3. Extra Safety Check: Ensure aiImageUrl is a string
-        const finalAiUrl = typeof aiImageUrl === 'string' ? aiImageUrl : (aiImageUrl?.url || "");
-        if (!finalAiUrl) throw new Error("Failed to get valid AI image URL");
-
-        // 4. Deduct Credit & Save Order
+        // 5. Deduct Credit
         user.credits -= 1;
         await user.save();
 
+        // 6. Save Order
         const newOrder = new Order({
             userId: userId,
             email: email,
             category: category,
             gender: gender,
-            aiImageUrl: finalAiUrl, // String hi jayega
+            aiImageUrl: aiImageUrl,
             originalImageUrl: originalImageUrl,
             status: 'completed'
         });
         await newOrder.save();
 
-        // 5. Cleanup
+        // 7. Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
 
+        // 8. Send Response
         res.json({ 
             success: true, 
-            ai_image_url: finalAiUrl, 
+            ai_image_url: aiImageUrl, 
             original_image_url: originalImageUrl 
         });
 
     } catch (error) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        if (req.file) fs.unlinkSync(req.file.path);
         console.error("❌ [UPLOAD ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles Strings, Objects, and Arrays of Streams)
-app.post('/magic-prompt', async (req, res) => {
-    try {
-        const { userId, email, prompt } = req.body;
 
-        // 1. Validation
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user) return res.status(404).json({ success: false, error: "User not found" });
-        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
-        if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
-
-        console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
-
-        // 2. Run AI
-        const output = await replicate.run(
-            "black-forest-labs/flux-schnell", 
-            { input: { prompt: prompt } }
-        );
-
-        let finalImageUrl = "";
-
-        // 3. 🛠️ DEEP EXTRACTION LOGIC (The Bulletproof Way)
-        
-        // Step A: Agar output Array hai, toh pehle pehle element ko nikaal lein
-        let target = output;
-        if (Array.isArray(output) && output.length > 0) {
-            target = output[0];
-        }
-
-        // Step B: Ab 'target' ko check karein (String, Object, ya Stream)
-        if (typeof target === 'string' && target.startsWith('http')) {
-            // Case 1: Seedha URL mil gaya
-            finalImageUrl = target;
-        } 
-        else if (target && typeof target[Symbol.asyncIterator] === 'function') {
-            // Case 2: Ye ek STREAM hai (ReadableStream)
-            console.log("🌊 [MAGIC PROMPT] Detected Stream, converting to Buffer...");
-            const chunks = [];
-            for await (const chunk of target) {
-                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-            }
-            const buffer = Buffer.concat(chunks);
-
-            // Stream ko Cloudinary par upload karein
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
-                    if (error) reject(error); else resolve(result);
-                }).end(buffer);
-            });
-            finalImageUrl = uploadResult.secure_url;
-        } 
-        else if (target && typeof target === 'object') {
-            // Case 3: Ek normal Object hai (e.g. {url: "..."})
-            finalImageUrl = target.url || target.href || target.output || "";
-        }
-
-        // 4. Final Safety Check
-        if (!finalImageUrl || typeof finalImageUrl !== 'string' || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Failed to extract URL. Target type:", typeof target, "Raw target:", target);
-            throw new Error("AI returned an invalid format. Could not extract URL.");
-        }
-
-        console.log("✅ [MAGIC PROMPT] Success! Final URL:", finalImageUrl);
-
-        // 5. Permanent Storage (Agar Replicate ka temporary URL hai toh use Cloudinary par upload karein)
-        let permanentUrl = finalImageUrl;
-        if (!finalImageUrl.includes('cloudinary.com')) {
-            const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
-            permanentUrl = uploadResult.secure_url;
-        }
-
-        // 6. Deduct Credit & Save Order
-        user.credits -= 1;
-        await user.save();
-
-        const newOrder = new Order({
-            userId: userId,
-            email: email,
-            category: 'magic-prompt',
-            aiImageUrl: permanentUrl,
-            originalImageUrl: "",
-            status: 'completed'
-        });
-        await newOrder.save();
-
-        res.json({ success: true, ai_image_url: permanentUrl });
-
-    } catch (error) {
-        console.error("❌ [MAGIC PROMPT ERROR]:", error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
