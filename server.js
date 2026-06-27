@@ -225,7 +225,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 UPDATED: Magic Prompt Route (Fixed FileOutput Error)
+// 🚀 FULLY FIXED: Magic Prompt Route (Handles Strings, Objects, AND Streams)
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -244,25 +244,55 @@ app.post('/magic-prompt', async (req, res) => {
             { input: { prompt: prompt } }
         );
 
-        // 3. 🛠️ FIX: Extract String URL from FileOutput object
-        let aiImageUrl = "";
-        if (typeof output === 'string') {
-            aiImageUrl = output; // Agar seedha string hai
-        } else if (output && typeof output === 'object') {
-            // Agar FileOutput object hai, toh uske andar se URL nikaalein
-            aiImageUrl = output.url || output.href || output.output || ""; 
+        let finalImageUrl = "";
+
+        // --- 🛠️ THE FIX: ADVANCED EXTRACTION LOGIC ---
+
+        // CASE A: Agar seedha URL (String) hai
+        if (typeof output === 'string' && output.startsWith('http')) {
+            finalImageUrl = output;
+        } 
+        // CASE B: Agar Array hai (e.://...)
+        else if (Array.isArray(output) && output.length > 0 && typeof output[0] === 'string') {
+            finalImageUrl = output[0];
+        }
+        // CASE C: Agar Object hai (e.g. {url: "..."})
+        else if (output && typeof output === 'object' && !typeof output[Symbol.asyncIterator] === 'function') {
+            finalImageUrl = output.url || output.href || output.output || "";
+        }
+        // CASE D: AGAR STREAM HAI (Yahi problem kar raha tha!)
+        else if (output && typeof output[Symbol.asyncIterator] === 'function') {
+            console.log("🌊 [MAGIC PROMPT] Detected Stream, processing chunks...");
+            const chunks = [];
+            for await (const chunk of output) {
+                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            const buffer = Buffer.concat(chunks);
+            
+            // Stream ko Cloudinary par upload karein
+            const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
+                    if (error) reject(error); else resolve(result);
+                }).end(buffer);
+            });
+            finalImageUrl = uploadResult.secure_url;
         }
 
-        // Check karein ki URL mila ya nahi
-        if (!aiImageUrl || !aiImageUrl.startsWith('http')) {
+        // 3. Final Check: Kya humein valid URL mila?
+        if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
+            console.error("❌ [MAGIC PROMPT] Extraction failed. Output was:", output);
             throw new Error("AI returned an invalid format. Could not extract URL.");
         }
 
-        console.log("✅ [MAGIC PROMPT] AI URL extracted:", aiImageUrl);
+        console.log("✅ [MAGIC PROMPT] Success! Image URL:", finalImageUrl);
 
-        // 4. Upload the extracted STRING URL to Cloudinary
-        const uploadResult = await cloudinary.uploader.upload(aiImageUrl, { folder: "magic_prompts" });
-        const finalImageUrl = uploadResult.secure_url;
+        // 4. Agar URL seedha nahi mila (Stream case mein), toh use Cloudinary mein save karein
+        // (Agar pehle se Cloudinary ka URL hai toh dubara upload nahi hoga)
+        let finalStoredUrl = finalImageUrl;
+        if (!finalImageUrl.includes('cloudinary.com')) {
+            const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
+            finalStoredUrl = uploadResult.secure_url;
+        }
 
         // 5. Deduct Credit & Save Order
         user.credits -= 1;
@@ -272,13 +302,13 @@ app.post('/magic-prompt', async (req, res) => {
             userId: userId,
             email: email,
             category: 'magic-prompt',
-            aiImageUrl: finalImageUrl,
-            originalImageUrl: "", // Magic prompt mein original image nahi hoti
+            aiImageUrl: finalStoredUrl,
+            originalImageUrl: "",
             status: 'completed'
         });
         await newOrder.save();
 
-        res.json({ success: true, ai_image_url: finalImageUrl });
+        res.json({ success: true, ai_image_url: finalStoredUrl });
 
     } catch (error) {
         console.error("❌ [MAGIC PROMPT ERROR]:", error.message);
