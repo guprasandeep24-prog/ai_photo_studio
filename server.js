@@ -225,6 +225,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
+// 🚀 UPDATED: Magic Prompt Route (Fixed FileOutput Error)
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -235,7 +236,7 @@ app.post('/magic-prompt', async (req, res) => {
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
 
-        console.log("✨ [MAGIC PROMPT] Generating for:", prompt);
+        console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
 
         // 2. Run AI (Flux-Schnell Model)
         const output = await replicate.run(
@@ -243,10 +244,23 @@ app.post('/magic-prompt', async (req, res) => {
             { input: { prompt: prompt } }
         );
 
-        // 3. Get Image URL
-        let aiImageUrl = Array.isArray(output) ? output[0] : output;
+        // 3. 🛠️ FIX: Extract String URL from FileOutput object
+        let aiImageUrl = "";
+        if (typeof output === 'string') {
+            aiImageUrl = output; // Agar seedha string hai
+        } else if (output && typeof output === 'object') {
+            // Agar FileOutput object hai, toh uske andar se URL nikaalein
+            aiImageUrl = output.url || output.href || output.output || ""; 
+        }
 
-        // 4. Upload to Cloudinary for permanent storage
+        // Check karein ki URL mila ya nahi
+        if (!aiImageUrl || !aiImageUrl.startsWith('http')) {
+            throw new Error("AI returned an invalid format. Could not extract URL.");
+        }
+
+        console.log("✅ [MAGIC PROMPT] AI URL extracted:", aiImageUrl);
+
+        // 4. Upload the extracted STRING URL to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(aiImageUrl, { folder: "magic_prompts" });
         const finalImageUrl = uploadResult.secure_url;
 
@@ -257,8 +271,9 @@ app.post('/magic-prompt', async (req, res) => {
         const newOrder = new Order({
             userId: userId,
             email: email,
-            category: 'magic-prompt', // Mark as magic prompt
+            category: 'magic-prompt',
             aiImageUrl: finalImageUrl,
+            originalImageUrl: "", // Magic prompt mein original image nahi hoti
             status: 'completed'
         });
         await newOrder.save();
@@ -266,7 +281,7 @@ app.post('/magic-prompt', async (req, res) => {
         res.json({ success: true, ai_image_url: finalImageUrl });
 
     } catch (error) {
-        console.error("❌ [MAGIC PROMPT ERROR]:", error);
+        console.error("❌ [MAGIC PROMPT ERROR]:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
