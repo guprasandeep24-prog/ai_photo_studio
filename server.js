@@ -35,7 +35,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// --- TEMPLATES CONFIGURATION (Update these with your REAL Cloudinary URLs) ---
+// --- TEMPLATES CONFIGURATION ---
 const TEMPLATES = {
     'linkedin': { 
         'man': [
@@ -113,7 +113,6 @@ async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
             if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
         }
         
-        // Stream handling
         if (output && typeof output[Symbol.asyncIterator] === 'function') {
             const chunks = [];
             for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
@@ -140,7 +139,6 @@ async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
 
 app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend (Multi-Template Mode) is LIVE!"));
 
-// 🚀 NEW ROUTE: Get all templates for frontend
 app.get('/templates', (req, res) => {
     res.json(TEMPLATES);
 });
@@ -175,12 +173,10 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// 🚀 UPDATED: Upload Route (Handles Template Selection)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
         
-        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
@@ -189,7 +185,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             return res.status(400).json({ success: false, error: "Category, Gender, and Template are required" });
         }
 
-        // 2. Pick the correct template URL using the index
         const selectedTemplates = TEMPLATES[category][gender];
         const idx = parseInt(templateIndex);
 
@@ -198,18 +193,14 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         }
         const targetImageUrl = selectedTemplates[idx];
 
-        // 3. Upload original image to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
 
-        // 4. Run Face-Swap AI
         const aiImageUrl = await runAIFaceSwap(originalImageUrl, targetImageUrl);
 
-        // 5. Deduct Credit
         user.credits -= 1;
         await user.save();
 
-        // 6. Save Order
         const newOrder = new Order({
             userId: userId,
             email: email,
@@ -221,10 +212,8 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         });
         await newOrder.save();
 
-        // 7. Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
 
-        // 8. Send Response
         res.json({ 
             success: true, 
             ai_image_url: aiImageUrl, 
@@ -237,13 +226,11 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
-// 🚀 THE ULTIMATE FIX: Magic Prompt (Handles Strings, Objects, and Arrays of Streams)
-        app.post('/magic-prompt', async (req, res) => {
+
+app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
 
-        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
@@ -251,37 +238,27 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
 
-        // 2. Run AI
         const output = await replicate.run(
             "black-forest-labs/flux-schnell", 
             { input: { prompt: prompt } }
         );
 
         let finalImageUrl = "";
-
-        // 3. 🛠️ DEEP EXTRACTION LOGIC (The Bulletproof Way)
-        
-        // Step A: Agar output Array hai, toh pehle pehle element ko nikaal lein
         let target = output;
         if (Array.isArray(output) && output.length > 0) {
             target = output[0];
         }
 
-        // Step B: Ab 'target' ko check karein (String, Object, ya Stream)
         if (typeof target === 'string' && target.startsWith('http')) {
-            // Case 1: Seedha URL mil gaya
             finalImageUrl = target;
         } 
         else if (target && typeof target[Symbol.asyncIterator] === 'function') {
-            // Case 2: Ye ek STREAM hai (ReadableStream)
             console.log("🌊 [MAGIC PROMPT] Detected Stream, converting to Buffer...");
             const chunks = [];
             for await (const chunk of target) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
             }
             const buffer = Buffer.concat(chunks);
-
-            // Stream ko Cloudinary par upload karein
             const uploadResult = await new Promise((resolve, reject) => {
                 cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
                     if (error) reject(error); else resolve(result);
@@ -290,26 +267,19 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             finalImageUrl = uploadResult.secure_url;
         } 
         else if (target && typeof target === 'object') {
-            // Case 3: Ek normal Object hai (e.g. {url: "..."})
             finalImageUrl = target.url || target.href || target.output || "";
         }
 
-        // 4. Final Safety Check
         if (!finalImageUrl || typeof finalImageUrl !== 'string' || !finalImageUrl.startsWith('http')) {
-            console.error("❌ [MAGIC PROMPT] Failed to extract URL. Target type:", typeof target, "Raw target:", target);
-            throw new Error("AI returned an invalid format. Could not extract URL.");
+            throw new Error("AI returned an invalid format.");
         }
 
-        console.log("✅ [MAGIC PROMPT] Success! Final URL:", finalImageUrl);
-
-        // 5. Permanent Storage (Agar Replicate ka temporary URL hai toh use Cloudinary par upload karein)
         let permanentUrl = finalImageUrl;
         if (!finalImageUrl.includes('cloudinary.com')) {
             const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
             permanentUrl = uploadResult.secure_url;
         }
 
-        // 6. Deduct Credit & Save Order
         user.credits -= 1;
         await user.save();
 
@@ -330,6 +300,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });

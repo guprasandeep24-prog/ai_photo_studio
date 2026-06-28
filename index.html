@@ -74,7 +74,7 @@
 
     <!-- Hero -->
     <header class="hero-bg relative overflow-hidden min-h-[80vh] flex items-center">
-        <div class="absolute top-20 left-10 glass px-8 py-2 rounded-full text-xs font-bold float-element hidden md:block">
+        <div class="absolute top-20 left-10 glass px-4 py-2 rounded-full text-xs font-bold float-element hidden md:block">
             <i class="fa-solid fa-star text-yellow-400 mr-2"></i> #1 AI Photographer
         </div>
         <div class="container mx-auto px-6 grid md:grid-cols-2 gap-12 items-center py-20">
@@ -86,8 +86,7 @@
                 <h3 class="text-xl font-bold text-white mb-4 text-center">Start taking AI photos now →</h3>
                 <div class="space-y-4">
                     <input type="email" placeholder="Type your email..." class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button onclick="scrollToCategories()" class="w-full bg-indigo-6000 ...">Get Started <i class="fa-solid fa-arrow-right ml-2"></i></button>
-
+                    <button onclick="scrollToCategories()" class="w-full bg-indigo-600 px-4 py-4 rounded-xl font-bold text-white hover:bg-indigo-700 transition">Get Started <i class="fa-solid fa-arrow-right ml-2"></i></button>
                 </div>
             </div>
         </div>
@@ -104,62 +103,55 @@
         </div>
     </section>
 
-<!-- Category Section -->
-<section id="categories-section" class="container mx-auto px-6 py-20">
-    <div class="text-center mb-16">
-        <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-4">Choose Your Style</h2>
-        <p class="text-slate-400">Select a category to transform your look</p>
-    </div>
+    <!-- Category Section -->
+    <section id="categories-section" class="container mx-auto px-6 py-20">
+        <div class="text-center mb-16">
+            <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-4">Choose Your Style</h2>
+            <p class="text-slate-400">Select a category to transform your look</p>
+        </div>
 
-    <!-- Row 1: Standard Categories -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-        <div onclick="selectCategory('linkedin')" class="category-card cursor-pointer glass p-10 rounded-3xl text-center group">
-            <div class="w-20 h-20 bg-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 group-hover:scale-110 transition"><i class="fa-solid fa-briefcase"></i></div>
-            <h3 class="text-2xl font-bold mb-2">LinkedIn</h3><p class="text-slate-400">Corporate Look</p>
-        </div>
-        <div onclick="selectCategory('wedding')" class="category-card cursor-pointer glass p-10 rounded-3xl text-center group">
-            <div class="w-20 h-20 bg-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 group-hover:scale-110 transition"><i class="fa-solid fa-crown"></i></div>
-            <h3 class="text-2xl font-bold mb-2">Wedding</h3><p class="text-slate-400">Royal Look</p>
-        </div>
-        <div onclick="selectCategory('fashion')" class="category-card cursor-pointer glass p-10 rounded-3xl text-center group">
-            <div class="w-20 h-20 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 group-hover:scale-110 transition"><i class="fa-solid fa-shirt"></i></div>
-            <h3 class="text-2xl font-bold mb-2">Fashion</h3><p class="text-slate-400">Stylish Look</p>
-        </div>
-    </div>
-
-    <!-- Row 2: MAGIC PROMPT BOX (Wedding ke niche, full width) -->
-    <div class="grid grid-cols-1">
-        <div onclick="openMagicPrompt()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-indigo-500/30 hover:border-indigo-500 transition">
-            <div class="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <div onclick="selectCategory('linkedin')" class="category-card cursor-pointer glass p-10 rounded-3xl text-center group">
+                <div class="w-20 h-20 bg-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 group-hover:scale-110 transition"><i class="fa-solid fa-briefcase"></i></div>
+                <h3 class="text-2xl font-bold mb-2">LinkedIn</h3><p class="text-slate-400">Corporate Look</p>
             </div>
-            <h3 class="text-2xl font-bold mb-1 text-white">✨ Magic Prompt Mode</h3>
-            <p class="text-slate-400 text-sm">Type anything and let AI create it from scratch!</p>
+            <div onclick="selectCategory('wedding')" class="category-card cursor-pointer glass p-10 rounded-3xl text-center group">
+                <div class="w-20 h-20 bg-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 group-hover:scale-110 transition"><i class="fa-solid fa-crown"></i></div>
+                <h3 class="text-2xl font-bold mb-2">Wedding</h3><p class="text-slate-400">Royal Look</p>
+            </div>
+            <div onclick="selectCategory('fashion')" class="category-card cursor-pointer glass p-10 rounded-3xl text-center group">
+                <div class="w-20 h-20 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 group-hover:scale-110 transition"><i class="fa-solid fa-shirt"></i></div>
+                <h3 class="text-2xl font-bold mb-2">Fashion</h3><p class="text-slate-400">Stylish Look</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1">
+            <div onclick="openMagicPrompt()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-indigo-500/30 hover:border-indigo-500 transition">
+                <div class="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-1 text-white">✨ Magic Prompt Mode</h3>
+                <p class="text-slate-400 text-sm">Type anything and let AI create it from scratch!</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Magic Prompt Modal -->
+    <div id="magicPromptModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[150] p-4">
+        <div class="glass p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center border border-white/20">
+            <button onclick="closeMagicPrompt()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <h2 class="text-3xl font-bold mb-2 text-indigo-400 pt-4">Magic Prompt</h2>
+            <p class="text-slate-400 mb-6">Describe your dream image in detail...</p>
+            <textarea id="promptInput" rows="4" class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6" placeholder="e.g. A majestic lion wearing a crown in a neon cyberpunk city..."></textarea>
+            <button id="magicSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">Generate Magic ✨</button>
         </div>
     </div>
-</section>
-
-<!-- NEW: Magic Prompt Modal (Prompt likhne ke liye popup) -->
-<div id="magicPromptModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[150] p-4">
-    <div class="glass p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center border border-white/20">
-        <button onclick="closeMagicPrompt()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-        <h2 class="text-3xl font-bold mb-2 text-indigo-400 pt-4">Magic Prompt</h2>
-        <p class="text-slate-400 mb-6">Describe your dream image in detail...</p>
-        
-        <textarea id="promptInput" rows="4" class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6" placeholder="e.g. A majestic lion wearing a crown in a neon cyberpunk city..."></textarea>
-        
-        <button id="magicSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">
-            Generate Magic ✨
-        </button>
-    </div>
-</div>
 
     <!-- Upload Section -->
     <section id="upload-section" class="hidden container mx-auto px-6 py-12">
         <div class="max-w-2xl mx-auto glass p-10 rounded-[2.5rem] shadow-2xl border border-white/10 text-center">
             <button onclick="hideUploadSection()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-arrow-left"></i> Back</button>
             <h2 id="selected-cat-title" class="text-3xl font-bold mb-8 text-indigo-400 pt-4">Upload Photo</h2>
-            
             <div class="mb-8">
                 <p class="text-slate-400 text-sm mb-4 uppercase tracking-widest font-bold">1. Select Gender</p>
                 <div class="flex justify-center gap-6">
@@ -167,17 +159,14 @@
                     <button onclick="selectGender('woman')" id="btn-woman" class="gender-btn w-32 py-3 border-2 border-white/10 rounded-2xl font-bold hover:border-indigo-500 transition">Woman</button>
                 </div>
             </div>
-
             <div id="template-selection-container" class="hidden mb-8">
                 <p class="text-slate-400 text-sm mb-4 uppercase tracking-widest font-bold">2. Select Style</p>
                 <div id="template-list" class="grid grid-cols-5 gap-3"></div>
             </div>
-
             <input type="file" id="imageInput" class="hidden" accept="image/*">
             <div id="preview-container" class="hidden mb-8">
                 <img id="imagePreview" class="w-48 h-48 object-cover mx-auto rounded-3xl border-4 border-indigo-500/30 shadow-2xl">
             </div>
-
             <button onclick="document.getElementById('imageInput').click()" class="w-full bg-white/5 text-white py-5 rounded-2xl font-bold hover:bg-white/10 border border-white/10 transition mb-6">
                 <i class="fa-solid fa-camera mr-2"></i> 3. Choose Your Selfie
             </button>
@@ -188,7 +177,6 @@
     </section>
 
     <!-- Modals (Pricing, Loading, Success, Auth) -->
-    <!-- [Pricing Modal] -->
     <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[200] p-4">
         <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
             <div class="bg-indigo-600 p-10 text-white md:w-1/3 flex flex-col justify-center">
@@ -217,7 +205,6 @@
         </div>
     </div>
 
-    <!-- [Loading Modal] -->
     <div id="loadingModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-50">
         <div class="bg-white p-10 rounded-3xl text-center text-slate-900">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
@@ -225,21 +212,18 @@
         </div>
     </div>
 
-<!-- Success Modal Content (Updated) -->
-<!-- Success Modal (Make sure these IDs are EXACT) -->
+<!-- Success Modal -->
 <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
         <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
-        <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
-        <p class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
+        <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
+        <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
         
         <div class="relative group mb-6">
             <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                <!-- 1. RESULT IMAGE (The Big Image) -->
                 <div class="after-image w-full h-full">
                     <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl">
                 </div>
-                <!-- 2. ORIGINAL IMAGE (The Before Image) -->
                 <div id="beforeImageWrapper" class="before-image">
                     <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl">
                 </div>
@@ -255,7 +239,6 @@
     </div>
 </div>
 
-    <!-- [Auth Modal] -->
     <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
         <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative text-slate-900">
             <button id="closeAuthBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
@@ -276,7 +259,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // --- ⚠️ REPLACE WITH YOUR REAL CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
             authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
@@ -291,7 +273,6 @@
         const auth = getAuth(app);
         const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
-        // Global State
         window.selectedCategory = ""; 
         window.selectedGender = ""; 
         window.selectedFile = null; 
@@ -300,14 +281,12 @@
         window.selectedTemplateIndex = null;
         window.allTemplates = {};
 
-        // Auth & Nav
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
         window.togglePricingModal = () => document.getElementById('pricingModal').classList.toggle('hidden');
         
         window.switchAuthMode = () => {
             window.isLoginMode = !window.isLoginMode;
             document.getElementById('auth-title').innerText = window.isLoginMode ? "Welcome Back" : "Create Account";
-            document.getElementById('auth-subtitle').innerText = window.isLoginMode ? "Login to your account to continue" : "Join us to start generating AI photos";
             document.getElementById('authSubmitBtn').innerText = window.isLoginMode ? "Login" : "Sign Up";
             document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
             document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
@@ -332,65 +311,66 @@
                 toggleAuthModal();
             } catch (error) { alert("Auth Error: " + error.message); }
         });
-            // 1. Magic Prompt Modal ko kholne aur band karne ke liye
-window.openMagicPrompt = () => {
-    document.getElementById('magicPromptModal').classList.remove('hidden');
-};
 
-window.closeMagicPrompt = () => {
-    document.getElementById('magicPromptModal').classList.add('hidden');
-    document.getElementById('promptInput').value = ""; // Clear input
-};
+        window.openMagicPrompt = () => document.getElementById('magicPromptModal').classList.remove('hidden');
+        window.closeMagicPrompt = () => {
+            document.getElementById('magicPromptModal').classList.add('hidden');
+            document.getElementById('promptInput').value = ""; 
+        };
 
-// 2. Magic Prompt Submit karne ka logic
-document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
-    const user = auth.currentUser;
-    const promptText = document.getElementById('promptInput').value.trim();
+        // UPDATED: Magic Prompt Submit logic with Slider Fix
+        document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
+            const user = auth.currentUser;
+            const promptText = document.getElementById('promptInput').value.trim();
 
-    if (!user) return alert("Please Login first!");
-    if (!promptText) return alert("Please enter a prompt!");
+            if (!user) return alert("Please Login first!");
+            if (!promptText) return alert("Please enter a prompt!");
 
-    // Loading dikhayein
-    document.getElementById('loadingModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.remove('hidden');
 
-    try {
-        const response = await fetch(`${BASE_URL}/magic-prompt`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: user.uid,
-                email: user.email,
-                prompt: promptText
-            })
+            try {
+                const response = await fetch(`${BASE_URL}/magic-prompt`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.uid,
+                        email: user.email,
+                        prompt: promptText
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Success! 
+                    document.getElementById('resultImage').src = result.ai_image_url;
+                    document.getElementById('downloadBtn').href = result.ai_image_url;
+                    
+                    // MAGIC PROMPT MODE UI FIX: Hide slider elements
+                    document.getElementById('successTitle').innerText = "Magic Done!";
+                    document.getElementById('successSubtitle').innerText = "Your masterpiece is ready.";
+                    document.getElementById('beforeImageWrapper').style.display = 'none';
+                    document.getElementById('sliderHandle').style.display = 'none';
+                    document.getElementById('comparisonSlider').style.display = 'none';
+
+                    closeMagicPrompt();
+                    document.getElementById('successModal').classList.remove('hidden');
+                    document.getElementById('loadingModal').classList.add('hidden');
+                } else {
+                    throw new Error(result.error || "Generation failed");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+                document.getElementById('loadingModal').classList.add('hidden');
+            }
         });
 
-        const result = await response.json();
-
-        if (result.success) {
-            // Success! Image dikhayein
-            document.getElementById('resultImage').src = result.ai_image_url;
-            document.getElementById('downloadBtn').href = result.ai_image_url;
-            
-            // Modal band karein aur Success dikhayein
-            closeMagicPrompt();
-            document.getElementById('successModal').classList.remove('hidden');
-            document.getElementById('loadingModal').classList.add('hidden');
-        } else {
-            throw new Error(result.error || "Generation failed");
-        }
-    } catch (error) {
-        alert("❌ Error: " + error.message);
-        document.getElementById('loadingModal').classList.add('hidden');
-    }
-});
         window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
-        // --- TEMPLATE LOGIC ---
         async function fetchTemplatesFromServer() {
             try {
                 const res = await fetch(`${BASE_URL}/templates`);
                 window.allTemplates = await res.json();
-                console.log("✅ Templates Loaded");
             } catch (err) { console.error("❌ Failed to fetch templates:", err); }
         }
 
@@ -398,7 +378,6 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
             const container = document.getElementById('template-selection-container');
             const list = document.getElementById('template-list');
             list.innerHTML = ""; 
-            
             const selectedList = window.allTemplates[category][gender];
             if (selectedList && selectedList.length > 0) {
                 container.classList.remove('hidden');
@@ -524,6 +503,7 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
             }
         });
 
+        // FACE-SWAP SUBMIT LOGIC
         document.getElementById('submitBtn').addEventListener('click', async function() {
             const user = auth.currentUser;
             if (!user) return alert("Please Login first!");
@@ -537,7 +517,7 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
             formData.append('email', user.email);
             formData.append('category', window.selectedCategory);
             formData.append('gender', window.selectedGender);
-            formData.append('templateIndex', window.selectedTemplateIndex); // SENDING THE INDEX
+            formData.append('templateIndex', window.selectedTemplateIndex); 
             formData.append('image', window.selectedFile);
 
             document.getElementById('loadingModal').classList.remove('hidden');
@@ -546,6 +526,13 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                 const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
                 const result = await response.json();
                 if (result.success) {
+                    // FACE-SWAP UI: SHOW SLIDER
+                    document.getElementById('successTitle').innerText = "Magic Done!";
+                    document.getElementById('successSubtitle').innerText = "Your professional photo is ready.";
+                    document.getElementById('beforeImageWrapper').style.display = 'block';
+                    document.getElementById('sliderHandle').style.display = 'flex';
+                    document.getElementById('comparisonSlider').style.display = 'block';
+
                     document.getElementById('resultImage').src = result.ai_image_url;
                     document.getElementById('originalImagePreview').src = window.originalImageUrl; 
                     document.getElementById('downloadBtn').href = result.ai_image_url;
@@ -569,7 +556,6 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                 document.getElementById('loadingModal').classList.add('hidden');
             }
         });
-
 
         // --- RAZORPAY ---
         window.startPayment = async (amount, credits) => {
@@ -621,27 +607,23 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
         document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
         document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
         window.scrollToCategories = () => {
-    const section = document.getElementById('categories-section');
-    section.classList.remove('hidden'); // Ensure section is visible
-    section.scrollIntoView({ behavior: 'smooth' }); // Smoothly scroll karein
-};
-        // TIMER FUNCTION (Corrected and placed outside)
+            const section = document.getElementById('categories-section');
+            section.classList.remove('hidden');
+            section.scrollIntoView({ behavior: 'smooth' });
+        };
+
         function startTimer(durationInSeconds) {
             let timer = durationInSeconds;
             const display = document.querySelector('#countdown'); 
             if (!display) return;
-
             const interval = setInterval(function () {
                 let hours = Math.floor(timer / 3600);
                 let minutes = Math.floor((timer % 3600) / 60);
                 let seconds = Math.floor(timer % 60);
-
                 hours = hours < 10 ? "0" + hours : hours;
                 minutes = minutes < 10 ? "0" + minutes : minutes;
                 seconds = seconds < 10 ? "0" + seconds : seconds;
-
                 display.textContent = hours + ":" + minutes + ":" + seconds;
-
                 if (--timer < 0) {
                     clearInterval(interval);
                     display.textContent = "00:00:00";
@@ -649,7 +631,6 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
             }, 1000);
         }
 
-        // Start timer when page loads
         document.addEventListener('DOMContentLoaded', function() {
             startTimer(86400); 
         });
