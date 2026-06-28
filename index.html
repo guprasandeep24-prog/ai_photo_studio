@@ -514,52 +514,56 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
         });
 
         document.getElementById('submitBtn').addEventListener('click', async function() {
-            const user = auth.currentUser;
-            if (!user) return alert("Please Login first!");
-            if (!window.selectedCategory) return alert("Please select a Category!");
-            if (!window.selectedGender) return alert("Please select Gender!");
-            if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
-            if (!window.selectedFile) return alert("Please select an image!");
+    const user = auth.currentUser;
+    if (!user) return alert("Please Login first!");
+    if (!window.selectedCategory) return alert("Please select a Category!");
+    
+    // Mode-based validation
+    if (window.selectedCategory !== 'magic-prompt') {
+        if (!window.selectedGender) return alert("Please select Gender!");
+        if (!window.selectedFile) return alert("Please select an image!");
+    } else {
+        if (window.selectedTemplateIndex === null) return alert("Please select a Style!");
+    }
 
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('email', user.email);
-            formData.append('category', window.selectedCategory);
-            formData.append('gender', window.selectedGender);
-            formData.append('templateIndex', window.selectedTemplateIndex);
-            formData.append('image', window.selectedFile);
+    const formData = new FormData();
+    formData.append('userId', user.uid);
+    formData.append('email', user.email);
+    formData.append('category', window.selectedCategory);
+    formData.append('gender', window.selectedGender || "");
+    formData.append('templateIndex', window.selectedTemplateIndex !== null ? window.selectedTemplateIndex : "");
+    formData.append('image', window.selectedFile);
 
-            document.getElementById('loadingModal').classList.remove('hidden');
+    document.getElementById('loadingModal').classList.remove('hidden');
 
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
+    try {
+        const endpoint = window.selectedCategory === 'magic-prompt' ? '/magic-prompt' : '/upload';
+        const response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', body: formData });
+        const result = await response.json();
+
+        if (result.success) {
             const resultContainer = document.getElementById('result-container');
-            const promptText = document.getElementById('promptInput').value; // User ka prompt pakadna
+            const downloadBtn = document.getElementById('downloadBtn');
 
-            // 1. Common Setup
-            document.getElementById('resultImage').src = result.ai_image_url;
-            document.getElementById('downloadBtn').href = result.ai_image_url;
-            document.getElementById('successModal').classList.remove('hidden');
-            document.getElementById('loadingModal').classList.add('hidden');
+            // 1. Common setup
+            downloadBtn.href = result.ai_image_url;
 
-            // 2. 🌟 SMART DISPLAY LOGIC 🌟
+            // 2. ✨ SMART DYNAMIC UI INJECTION ✨
             if (window.selectedCategory === 'magic-prompt') {
                 // --- MAGIC PROMPT VIEW (Prompt + Image) ---
                 resultContainer.innerHTML = `
                     <div class="text-left mb-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                        <p class        class="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-1">Your Prompt</p>
-                        <p class="text-xs italic text-slate-700 leading-relaxed">"${promptText}"</p>
+                        <p class="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-1">Your Prompt</p>
+                        <p class="text-xs italic text-slate-700 leading-relaxed">"${document.getElementById('promptInput').value}"</p>
                     </div>
                     <div class="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
                         <img src="${result.ai_image_url}" class="w-full h-64 object-cover">
                     </div>
                 `;
-                console.log("✨ Displaying Prompt + Image View");
+                console.log("✨ Mode: Magic Prompt UI Injected");
 
             } else {
-                // --- FACE-SWAP VIEW (Old Slider) ---
+                // --- FACE-SWAP VIEW (Slider) ---
                 resultContainer.innerHTML = `
                     <div class="relative group">
                         <div class="comparison-container border-2 border-slate-100 shadow-inner">
@@ -575,25 +579,37 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                     </div>
                 `;
 
-                // Slider ko dobara activate karein
-                const slider = document.getElementById('comparisonSlider');
-                const beforeWrapper = document.getElementById('beforeImageWrapper');
-                const handle = document.getElementById('sliderHandle');
+                // Slider ko chalane ke liye elements ko inject hone ke BAAD access karein
+                // setTimeout ka use isliye taaki HTML browser mein pehle render ho jaye
+                setTimeout(() => {
+                    const slider = document.getElementById('comparisonSlider');
+                    const beforeWrapper = document.getElementById('beforeImageWrapper');
+                    const handle = document.getElementById('sliderHandle');
 
-                slider.oninput = (e) => {
-                    const val = e.target.value;
-                    beforeWrapper.style.width = `${val}%`;
-                    handle.style.left = `${val}%`;
-                };
-                console.log("🔄 Displaying Face-Swap Slider View");
+                    if (slider) {
+                        slider.oninput = (e) => {
+                            const val = e.target.value;
+                            beforeWrapper.style.width = `${val}%`;
+                            handle.style.left = `${val}%`;
+                        };
+                        console.log("🔄 Mode: Face-Swap Slider Injected & Activated");
+                    }
+                }, 100);
             }
+
+            // 3. Show the Modal
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+
+        } else {
+            throw new Error(result.error || "AI Generation failed");
         }
-                else { throw new Error(result.error || "AI Generation failed"); }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
-            }
-        });
+    } catch (error) {
+        console.error("❌ Submission Error:", error);
+        alert("❌ Error: " + error.message);
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+});
 
         // --- RAZORPAY ---
         window.startPayment = async (amount, credits) => {
