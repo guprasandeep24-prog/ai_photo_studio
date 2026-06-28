@@ -239,7 +239,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 });
 // 🚀 NEW ROUTE: Magic Prompt (Separate from Face-Swap)
 // 🚀 THE ULTIMATE FIX: Magic Prompt (Handles Strings, Objects, and Arrays of Streams)
-app.post('/magic-prompt', async (req, res) => {
+        app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
 
