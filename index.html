@@ -513,17 +513,17 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
             }
         });
 
-        document.getElementById('submitBtn').addEventListener('click', async function() {
+document.getElementById('submitBtn').addEventListener('click', async function() {
     const user = auth.currentUser;
     if (!user) return alert("Please Login first!");
     if (!window.selectedCategory) return alert("Please select a Category!");
     
-    // Mode-based validation
-    if (window.selectedCategory !== 'magic-prompt') {
+    // Mode validation
+    if (window.selectedCategory === 'magic-prompt') {
+        if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
+    } else {
         if (!window.selectedGender) return alert("Please select Gender!");
         if (!window.selectedFile) return alert("Please select an image!");
-    } else {
-        if (window.selectedTemplateIndex === null) return alert("Please select a Style!");
     }
 
     const formData = new FormData();
@@ -544,13 +544,16 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
         if (result.success) {
             const resultContainer = document.getElementById('result-container');
             const downloadBtn = document.getElementById('downloadBtn');
+            const successModal = document.getElementById('successModal');
 
-            // 1. Common setup
+            // Sabse pehle download button ka URL set karein
             downloadBtn.href = result.ai_image_url;
 
-            // 2. ✨ SMART DYNAMIC UI INJECTION ✨
+            // 🌟 MODE-BASED UI INJECTION (NO MORE NULL ERROR) 🌟
             if (window.selectedCategory === 'magic-prompt') {
-                // --- MAGIC PROMPT VIEW (Prompt + Image) ---
+                // --- MAGIC PROMPT VIEW ---
+                // Yahan hum direct HTML string mein URL daal rahe hain, 
+                // isliye getElementById('resultImage') ki zaroorat hi nahi hai.
                 resultContainer.innerHTML = `
                     <div class="text-left mb-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
                         <p class="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-1">Your Prompt</p>
@@ -560,10 +563,11 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                         <img src="${result.ai_image_url}" class="w-full h-64 object-cover">
                     </div>
                 `;
-                console.log("✨ Mode: Magic Prompt UI Injected");
+                console.log("✨ Mode: Magic Prompt UI Injected successfully.");
 
             } else {
-                // --- FACE-SWAP VIEW (Slider) ---
+                // --- FACE-SWAP VIEW ---
+                // Face-swap mein humein slider aur comparison chahiye
                 resultContainer.innerHTML = `
                     <div class="relative group">
                         <div class="comparison-container border-2 border-slate-100 shadow-inner">
@@ -579,8 +583,7 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                     </div>
                 `;
 
-                // Slider ko chalane ke liye elements ko inject hone ke BAAD access karein
-                // setTimeout ka use isliye taaki HTML browser mein pehle render ho jaye
+                // Slider ko activate karne ke liye setTimeout use karein (Taaki DOM mein element aa jaye)
                 setTimeout(() => {
                     const slider = document.getElementById('comparisonSlider');
                     const beforeWrapper = document.getElementById('beforeImageWrapper');
@@ -592,13 +595,13 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                             beforeWrapper.style.width = `${val}%`;
                             handle.style.left = `${val}%`;
                         };
-                        console.log("🔄 Mode: Face-Swap Slider Injected & Activated");
+                        console.log("🔄 Mode: Face-Swap Slider Activated.");
                     }
                 }, 100);
             }
 
-            // 3. Show the Modal
-            document.getElementById('successModal').classList.remove('hidden');
+            // Success Modal dikhayein
+            successModal.classList.remove('hidden');
             document.getElementById('loadingModal').classList.add('hidden');
 
         } else {
