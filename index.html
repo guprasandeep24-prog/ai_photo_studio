@@ -74,7 +74,7 @@
 
     <!-- Hero -->
     <header class="hero-bg relative overflow-hidden min-h-[80vh] flex items-center">
-        <div class="absolute top-20 left-10 glass px-4 py-2 rounded-full text-xs font-bold float-element hidden md:block">
+        <div class="absolute top-20 left-10 glass px-8 py-2 rounded-full text-xs font-bold float-element hidden md:block">
             <i class="fa-solid fa-star text-yellow-400 mr-2"></i> #1 AI Photographer
         </div>
         <div class="container mx-auto px-6 grid md:grid-cols-2 gap-12 items-center py-20">
@@ -86,7 +86,7 @@
                 <h3 class="text-xl font-bold text-white mb-4 text-center">Start taking AI photos now →</h3>
                 <div class="space-y-4">
                     <input type="email" placeholder="Type your email..." class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button onclick="scrollToCategories()" class="w-full bg-indigo-600 ...">Get Started <i class="fa-solid fa-arrow-right ml-2"></i></button>
+                    <button onclick="scrollToCategories()" class="w-full bg-indigo-6000 ...">Get Started <i class="fa-solid fa-arrow-right ml-2"></i></button>
 
                 </div>
             </div>
@@ -226,15 +226,26 @@
     </div>
 
 <!-- Success Modal Content (Updated) -->
+<!-- Success Modal (Make sure these IDs are EXACT) -->
 <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
         <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
         <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
-        <p class="text-slate-500 mb-4 text-sm">Your creation is ready.</p>
+        <p class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
         
-        <!-- 🌟 NEW: Dynamic Result Container 🌟 -->
-        <div id="result-container" class="mb-6">
-            <!-- Iske andar JS ke zariye ya toh Slider aayega ya Prompt+Image -->
+        <div class="relative group mb-6">
+            <div class="comparison-container border-2 border-slate-100 shadow-inner">
+                <!-- 1. RESULT IMAGE (The Big Image) -->
+                <div class="after-image w-full h-full">
+                    <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl">
+                </div>
+                <!-- 2. ORIGINAL IMAGE (The Before Image) -->
+                <div id="beforeImageWrapper" class="before-image">
+                    <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl">
+                </div>
+                <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+            </div>
         </div>
 
         <div class="flex flex-col gap-3">
@@ -487,8 +498,8 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                     grid.innerHTML = "";
                     photos.forEach(photo => {
                         const card = document.createElement('div');
-                        card.className = "bg-white/5 rounded-xl overflow-hidden shadow-lg border border-white/10";
-                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs px-2 py-1 bg-indigo-500/20 rounded text-indigo-400 capitalize">${photo.category}</span><span class="text-[10px] text-slate-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
+                        card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
+                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span><span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
                         grid.appendChild(card);
                     });
                 } else {
@@ -513,106 +524,52 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
             }
         });
 
-document.getElementById('submitBtn').addEventListener('click', async function() {
-    const user = auth.currentUser;
-    if (!user) return alert("Please Login first!");
-    if (!window.selectedCategory) return alert("Please select a Category!");
-    
-    // Mode validation
-    if (window.selectedCategory === 'magic-prompt') {
-        if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
-    } else {
-        if (!window.selectedGender) return alert("Please select Gender!");
-        if (!window.selectedFile) return alert("Please select an image!");
-    }
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            const user = auth.currentUser;
+            if (!user) return alert("Please Login first!");
+            if (!window.selectedCategory) return alert("Please select a Category!");
+            if (!window.selectedGender) return alert("Please select Gender!");
+            if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
+            if (!window.selectedFile) return alert("Please select an image!");
 
-    const formData = new FormData();
-    formData.append('userId', user.uid);
-    formData.append('email', user.email);
-    formData.append('category', window.selectedCategory);
-    formData.append('gender', window.selectedGender || "");
-    formData.append('templateIndex', window.selectedTemplateIndex !== null ? window.selectedTemplateIndex : "");
-    formData.append('image', window.selectedFile);
+            const formData = new FormData();
+            formData.append('userId', user.uid);
+            formData.append('email', user.email);
+            formData.append('category', window.selectedCategory);
+            formData.append('gender', window.selectedGender);
+            formData.append('templateIndex', window.selectedTemplateIndex); // SENDING THE INDEX
+            formData.append('image', window.selectedFile);
 
-    document.getElementById('loadingModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.remove('hidden');
 
-    try {
-        const endpoint = window.selectedCategory === 'magic-prompt' ? '/magic-prompt' : '/upload';
-        const response = await fetch(`${BASE_URL}${endpoint}`, { method: 'POST', body: formData });
-        const result = await response.json();
-
-        if (result.success) {
-            const resultContainer = document.getElementById('result-container');
-            const downloadBtn = document.getElementById('downloadBtn');
-            const successModal = document.getElementById('successModal');
-
-            // Sabse pehle download button ka URL set karein
-            downloadBtn.href = result.ai_image_url;
-
-            // 🌟 MODE-BASED UI INJECTION (NO MORE NULL ERROR) 🌟
-            if (window.selectedCategory === 'magic-prompt') {
-                // --- MAGIC PROMPT VIEW ---
-                // Yahan hum direct HTML string mein URL daal rahe hain, 
-                // isliye getElementById('resultImage') ki zaroorat hi nahi hai.
-                resultContainer.innerHTML = `
-                    <div class="text-left mb-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                        <p class="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-1">Your Prompt</p>
-                        <p class="text-xs italic text-slate-700 leading-relaxed">"${document.getElementById('promptInput').value}"</p>
-                    </div>
-                    <div class="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
-                        <img src="${result.ai_image_url}" class="w-full h-64 object-cover">
-                    </div>
-                `;
-                console.log("✨ Mode: Magic Prompt UI Injected successfully.");
-
-            } else {
-                // --- FACE-SWAP VIEW ---
-                // Face-swap mein humein slider aur comparison chahiye
-                resultContainer.innerHTML = `
-                    <div class="relative group">
-                        <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                            <div class="after-image w-full h-full">
-                                <img id="resultImage" src="${result.ai_image_url}" class="w-full h-full object-cover rounded-2xl">
-                            </div>
-                            <div id="beforeImageWrapper" class="before-image">
-                                <img id="originalImagePreview" src="${window.originalImageUrl}" class="w-full h-full object-cover rounded-2xl">
-                            </div>
-                            <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
-                            <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
-                        </div>
-                    </div>
-                `;
-
-                // Slider ko activate karne ke liye setTimeout use karein (Taaki DOM mein element aa jaye)
-                setTimeout(() => {
+            try {
+                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('resultImage').src = result.ai_image_url;
+                    document.getElementById('originalImagePreview').src = window.originalImageUrl; 
+                    document.getElementById('downloadBtn').href = result.ai_image_url;
+                    document.getElementById('successModal').classList.remove('hidden');
+                    document.getElementById('loadingModal').classList.add('hidden');
+                    
                     const slider = document.getElementById('comparisonSlider');
                     const beforeWrapper = document.getElementById('beforeImageWrapper');
                     const handle = document.getElementById('sliderHandle');
 
-                    if (slider) {
-                        slider.oninput = (e) => {
-                            const val = e.target.value;
-                            beforeWrapper.style.width = `${val}%`;
-                            handle.style.left = `${val}%`;
-                        };
-                        console.log("🔄 Mode: Face-Swap Slider Activated.");
-                    }
-                }, 100);
+                    slider.addEventListener('input', (e) => {
+                        const val = e.target.value;
+                        beforeWrapper.style.width = `${val}%`;
+                        handle.style.left = `${val}%`;
+                    });
+                } else {
+                    throw new Error(result.error || "AI Generation failed");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+                document.getElementById('loadingModal').classList.add('hidden');
             }
+        });
 
-            // Success Modal dikhayein
-            successModal.classList.remove('hidden');
-            document.getElementById('loadingModal').classList.add('hidden');
-
-        } else {
-            throw new Error(result.error || "AI Generation failed");
-        }
-    } catch (error) {
-        console.error("❌ Submission Error:", error);
-        alert("❌ Error: " + error.message);
-        document.getElementById('loadingModal').classList.add('hidden');
-    }
-});
 
         // --- RAZORPAY ---
         window.startPayment = async (amount, credits) => {
