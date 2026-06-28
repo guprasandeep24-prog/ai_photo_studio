@@ -225,25 +225,24 @@
         </div>
     </div>
 
-    <!-- [Success Modal] -->
-    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
-            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
-            <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
-            <div class="relative group mb-6">
-                <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                    <div class="after-image w-full h-full"><img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl"></div>
-                    <div id="beforeImageWrapper" class="before-image"><img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl"></div>
-                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
-                    <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
-                </div>
-            </div>
-            <div class="flex flex-col gap-3">
-                <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Download</a>
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold">Try Another</button>
-            </div>
+<!-- Success Modal Content (Updated) -->
+<div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
+        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
+        <h2 class="text-2xl font-bold mb-1">Magic Done!</h2>
+        <p class="text-slate-500 mb-4 text-sm">Your creation is ready.</p>
+        
+        <!-- 🌟 NEW: Dynamic Result Container 🌟 -->
+        <div id="result-container" class="mb-6">
+            <!-- Iske andar JS ke zariye ya toh Slider aayega ya Prompt+Image -->
+        </div>
+
+        <div class="flex flex-col gap-3">
+            <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
+            <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try Another</button>
         </div>
     </div>
+</div>
 
     <!-- [Auth Modal] -->
     <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
@@ -536,21 +535,60 @@ document.getElementById('magicSubmitBtn').addEventListener('click', async functi
                 const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
                 const result = await response.json();
                 if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = window.originalImageUrl; 
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    const slider = document.getElementById('comparisonSlider');
-                    const beforeWrapper = document.getElementById('beforeImageWrapper');
-                    const handle = document.getElementById('sliderHandle');
-                    slider.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        beforeWrapper.style.width = `${val}%`;
-                        handle.style.left = `${val}%`;
-                    });
-                } else { throw new Error(result.error || "AI Generation failed"); }
+            const resultContainer = document.getElementById('result-container');
+            const promptText = document.getElementById('promptInput').value; // User ka prompt pakadna
+
+            // 1. Common Setup
+            document.getElementById('resultImage').src = result.ai_image_url;
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+
+            // 2. 🌟 SMART DISPLAY LOGIC 🌟
+            if (window.selectedCategory === 'magic-prompt') {
+                // --- MAGIC PROMPT VIEW (Prompt + Image) ---
+                resultContainer.innerHTML = `
+                    <div class="text-left mb-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <p class        class="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-1">Your Prompt</p>
+                        <p class="text-xs italic text-slate-700 leading-relaxed">"${promptText}"</p>
+                    </div>
+                    <div class="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
+                        <img src="${result.ai_image_url}" class="w-full h-64 object-cover">
+                    </div>
+                `;
+                console.log("✨ Displaying Prompt + Image View");
+
+            } else {
+                // --- FACE-SWAP VIEW (Old Slider) ---
+                resultContainer.innerHTML = `
+                    <div class="relative group">
+                        <div class="comparison-container border-2 border-slate-100 shadow-inner">
+                            <div class="after-image w-full h-full">
+                                <img id="resultImage" src="${result.ai_image_url}" class="w-full h-full object-cover rounded-2xl">
+                            </div>
+                            <div id="beforeImageWrapper" class="before-image">
+                                <img id="originalImagePreview" src="${window.originalImageUrl}" class="w-full h-full object-cover rounded-2xl">
+                            </div>
+                            <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                            <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                `;
+
+                // Slider ko dobara activate karein
+                const slider = document.getElementById('comparisonSlider');
+                const beforeWrapper = document.getElementById('beforeImageWrapper');
+                const handle = document.getElementById('sliderHandle');
+
+                slider.oninput = (e) => {
+                    const val = e.target.value;
+                    beforeWrapper.style.width = `${val}%`;
+                    handle.style.left = `${val}%`;
+                };
+                console.log("🔄 Displaying Face-Swap Slider View");
+            }
+        }
+                else { throw new Error(result.error || "AI Generation failed"); }
             } catch (error) {
                 alert("❌ Error: " + error.message);
                 document.getElementById('loadingModal').classList.add('hidden');
