@@ -271,10 +271,10 @@ app.post('/upscale', async (req, res) => {
 
         console.log("🚀 [UPSCALE] Starting Enhancement using Real-ESRGAN-v2...");
 
-        // Using the EXACT model and version from your Replicate URL
+        // FIX: Changed scale from 4 to 2 to satisfy the model's validation requirements
         const output = await replicate.run(
             "juergengunz/real-esrgan-v2:e4265d21c4770b339080060fab33e452d77b8ef3ee9781fec9cae81d1973a2cf", 
-            { input: { image: imageUrl, scale: 4 } } 
+            { input: { image: imageUrl, scale: 2 } } 
         );
 
         let upscaledUrl = "";
@@ -290,15 +290,15 @@ app.post('/upscale', async (req, res) => {
             throw new Error("AI failed to upscale the image. Try again.");
         }
 
-        // Cloudinary पर सुरक्षित स्टोर करना
+        // Cloudinary upload
         const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "enhanced_images" });
         const finalUrl = uploadResult.secure_url;
 
-        // क्रेडिट कम करना
+        // Deduct credit
         user.credits -= 1;
         await user.save();
 
-        // ऑर्डर सेव करना
+        // Save Order
         await new Order({
             userId, email, category: 'upscale', aiImageUrl: finalUrl, originalImageUrl: imageUrl, status: 'completed'
         }).save();
