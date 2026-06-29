@@ -261,6 +261,7 @@ app.post('/magic-prompt', async (req, res) => {
 });
 
 // --- NEW ROUTE: AI UPSCALE (ENHANCE TO 4K) ---
+// --- UPDATED ROUTE: AI UPSCALE (Fixing the 422 Error) ---
 app.post('/upscale', async (req, res) => {
     try {
         const { userId, email, imageUrl } = req.body;
@@ -269,28 +270,46 @@ app.post('/upscale', async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid request or no credits" });
         }
 
-        console.log("🚀 [UPSCALE] Enhancing Image...");
+        console.log("🚀 [UPSCALE] Starting Enhancement...");
+
+        // हमने यहाँ से लंबा Hash हटा दिया है और सिर्फ 'lucataco/real-esrgan' रखा है
+        // यह हमेशा लेटेस्ट वर्शन को इस्तेमाल करेगा और Error नहीं आएगा।
         const output = await replicate.run(
-            "lucataco/real-esrgan:c3e3916d403670753262f36714d842b969f9a770516b997b45c307f961963a07", 
-            { input: { image: imageUrl, scale: 4 } }
+            "lucataco/real-esrgan", 
+            { input: { image: imageUrl, scale: 4 } } 
         );
 
-        let upscaledUrl = Array.isArray(output) ? output[0] : output;
-        if (typeof upscaledUrl !== 'string') throw new Error("Upscale failed");
+        let upscaledUrl = "";
+        if (typeof output === 'string') {
+            upscaledUrl = output;
+        } else if (Array.isArray(output) && output.length > 0) {
+            upscaledUrl = output[0];
+        } else if (output && typeof output === 'object') {
+            upscaledUrl = output.url || output.href || output.output || "";
+        }
 
+        if (!upscaledUrl || !upscaledUrl.startsWith('http')) {
+            throw new Error("AI failed to upscale the image. Try again.");
+        }
+
+        // Cloudinary पर सुरक्षित स्टोर करना
         const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "enhanced_images" });
         const finalUrl = uploadResult.secure_url;
 
+        // क्रेडिट कम करना
         user.credits -= 1;
         await user.save();
 
+        // ऑर्डर सेव करना
         await new Order({
             userId, email, category: 'upscale', aiImageUrl: finalUrl, originalImageUrl: imageUrl, status: 'completed'
         }).save();
 
+        console.log("✅ [UPSCALE] Success! Final URL:", finalUrl);
         res.json({ success: true, ai_image_url: finalUrl });
+
     } catch (error) {
-        console.error("❌ [UPSCALE ERROR]:", error.message);
+        console.error("❌ [UPSCSCALE ERROR]:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
