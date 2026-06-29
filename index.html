@@ -212,10 +212,12 @@
         </div>
     </div>
 
-<!-- Success Modal -->
+<!-- SUCCESS MODAL (REPLACE YOUR ENTIRE OLD SUCCESS MODAL WITH THIS) -->
 <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
-        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
+        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+            <i class="fa-solid fa-check"></i>
+        </div>
         <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
         <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
         
@@ -234,22 +236,22 @@
             </div>
         </div>
 
-<!-- Button Group -->
-<div class="flex flex-col gap-3">
-    <!-- 1. Download Button (Blue/Indigo) -->
-    <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
-        <i class="fa-solid fa-download mr-2"></i> Download
-    </a>
+        <!-- THE CORRECTED BUTTON GROUP -->
+        <div class="flex flex-col gap-3">
+            <!-- 1. Download Button -->
+            <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
+                <i class="fa-solid fa-download mr-2"></i> Download
+            </a>
 
-    <!-- 2. Enhance Button (Amber/Orange) -->
-    <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
-        <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
-    </button>
+            <!-- 2. Enhance Button -->
+            <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
+            </button>
 
-    <!-- 3. Try Another Way Button (Premium Rose-Purple Gradient) -->
-    <button onclick="location.reload()" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-purple-500/30">
-        <i class="fa-solid fa-rotate-right mr-2"></i> Try another way
-    </button>
+            <!-- 3. Try Another Way Button (PREMIUM GRADIENT) -->
+            <button onclick="location.reload()" class="w-full bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <i class="fa-solid fa-rotate-right mr-2"></i> Try another way
+            </button>
         </div>
     </div>
 </div>
