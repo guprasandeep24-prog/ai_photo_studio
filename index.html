@@ -20,7 +20,7 @@
         .glass {
             background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            -webkit-backdropfilter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -212,7 +212,7 @@
         </div>
     </div>
 
-<!-- Success Modal (Updated with Try Another Way button) -->
+<!-- Success Modal -->
 <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
         <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
@@ -236,17 +236,14 @@
 
         <!-- Button Group -->
         <div class="flex flex-col gap-3">
-            <!-- 1. Download Button -->
             <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
                 <i class="fa-solid fa-download mr-2"></i> Download
             </a>
 
-            <!-- 2. Enhance Button -->
             <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
                 <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
             </button>
 
-            <!-- 3. NEW: Try Another Way Button -->
             <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
                 Try another way
             </button>
@@ -327,9 +324,8 @@
             } catch (error) { alert("Auth Error: " + error.message); }
         });
 
-        // --- NEW: ENHANCE/UPSCALE LOGIC ---
+        // --- ENHANCE/UPSCALE LOGIC ---
 
-        // 1. Handle Upscale for the Success Modal
         window.handleUpscale = async function() {
             const user = auth.currentUser;
             const currentImageUrl = document.getElementById('resultImage').src;
@@ -366,7 +362,6 @@
             }
         };
 
-        // 2. Handle Upscale for User Gallery
         window.handleGalleryUpscale = async function(btn, imageUrl) {
             const user = auth.currentUser;
             if (!user) return alert("Please Login first!");
@@ -387,7 +382,6 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Update the specific image in the card
                     const card = btn.closest('.bg-gray-800');
                     const img = card.querySelector('img');
                     img.src = result.ai_image_url;
@@ -402,9 +396,7 @@
             }
         };
 
-        // Attach the Success Modal Button Listener
         document.getElementById('enhanceBtn').onclick = window.handleUpscale;
-
 
         // --- END ENHANCE LOGIC ---
 
