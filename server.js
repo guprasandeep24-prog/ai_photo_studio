@@ -137,11 +137,8 @@ async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
 
 // --- ROUTES ---
 
-app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend (Multi-Template Mode) is LIVE!"));
-
-app.get('/templates', (req, res) => {
-    res.json(TEMPLATES);
-});
+app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
+app.get('/templates', (req, res) => { res.json(TEMPLATES); });
 
 app.post('/register', async (req, res) => {
     try {
@@ -176,20 +173,15 @@ app.get('/user-profile/:userId', async (req, res) => {
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
-        
         const user = await User.findOne({ firebaseUid: userId });
         if (!user) return res.status(404).json({ success: false, error: "User not found" });
         if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
         if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
-        if (!category || !gender || templateIndex === undefined) {
-            return res.status(400).json({ success: false, error: "Category, Gender, and Template are required" });
-        }
-
+        
         const selectedTemplates = TEMPLATES[category][gender];
         const idx = parseInt(templateIndex);
-
         if (!selectedTemplates || idx < 0 || idx >= selectedTemplates.length) {
-            return res.status(400).json({ success: false, error: "Invalid Template Selected" });
+            return res.status(400).json({ success: false, error: "Invalid Template" });
         }
         const targetImageUrl = selectedTemplates[idx];
 
@@ -202,27 +194,16 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         await user.save();
 
         const newOrder = new Order({
-            userId: userId,
-            email: email,
-            category: category,
-            gender: gender,
-            aiImageUrl: aiImageUrl,
-            originalImageUrl: originalImageUrl,
-            status: 'completed'
+            userId, email, category, gender,
+            aiImageUrl, originalImageUrl, status: 'completed'
         });
         await newOrder.save();
 
         if (req.file) fs.unlinkSync(req.file.path);
-
-        res.json({ 
-            success: true, 
-            ai_image_url: aiImageUrl, 
-            original_image_url: originalImageUrl 
-        });
+        res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
 
     } catch (error) {
         if (req.file) fs.unlinkSync(req.file.path);
-        console.error("❌ [UPLOAD ERROR]:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -230,34 +211,22 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
-
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user) return res.status(404).json({ success: false, error: "User not found" });
-        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
-        if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
+        if (!user || user.credits <= 0 || !prompt) {
+            return res.status(400).json({ success: false, error: "Invalid request or no credits" });
+        }
 
-        console.log("✨ [MAGIC PROMPT] Starting Generation for:", prompt);
-
-        const output = await replicate.run(
-            "black-forest-labs/flux-schnell", 
-            { input: { prompt: prompt } }
-        );
+        console.log("✨ [MAGIC PROMPT] Generating:", prompt);
+        const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
 
         let finalImageUrl = "";
-        let target = output;
-        if (Array.isArray(output) && output.length > 0) {
-            target = output[0];
-        }
+        let target = Array.isArray(output) ? output[0] : output;
 
         if (typeof target === 'string' && target.startsWith('http')) {
             finalImageUrl = target;
-        } 
-        else if (target && typeof target[Symbol.asyncIterator] === 'function') {
-            console.log("🌊 [MAGIC PROMPT] Detected Stream, converting to Buffer...");
+        } else if (target && typeof target[Symbol.asyncIterator] === 'function') {
             const chunks = [];
-            for await (const chunk of target) {
-                chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-            }
+            for await (const chunk of target) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
             const buffer = Buffer.concat(chunks);
             const uploadResult = await new Promise((resolve, reject) => {
                 cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
@@ -265,14 +234,11 @@ app.post('/magic-prompt', async (req, res) => {
                 }).end(buffer);
             });
             finalImageUrl = uploadResult.secure_url;
-        } 
-        else if (target && typeof target === 'object') {
+        } else if (target && typeof target === 'object') {
             finalImageUrl = target.url || target.href || target.output || "";
         }
 
-        if (!finalImageUrl || typeof finalImageUrl !== 'string' || !finalImageUrl.startsWith('http')) {
-            throw new Error("AI returned an invalid format.");
-        }
+        if (!finalImageUrl) throw new Error("Failed to get image URL");
 
         let permanentUrl = finalImageUrl;
         if (!finalImageUrl.includes('cloudinary.com')) {
@@ -284,19 +250,47 @@ app.post('/magic-prompt', async (req, res) => {
         await user.save();
 
         const newOrder = new Order({
-            userId: userId,
-            email: email,
-            category: 'magic-prompt',
-            aiImageUrl: permanentUrl,
-            originalImageUrl: "",
-            status: 'completed'
+            userId, email, category: 'magic-prompt', aiImageUrl: permanentUrl, originalImageUrl: "", status: 'completed'
         });
         await newOrder.save();
 
         res.json({ success: true, ai_image_url: permanentUrl });
-
     } catch (error) {
-        console.error("❌ [MAGIC PROMPT ERROR]:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// --- NEW ROUTE: AI UPSCALE (ENHANCE TO 4K) ---
+app.post('/upscale', async (req, res) => {
+    try {
+        const { userId, email, imageUrl } = req.body;
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user || user.credits <= 0 || !imageUrl) {
+            return res.status(400).json({ success: false, error: "Invalid request or no credits" });
+        }
+
+        console.log("🚀 [UPSCALE] Enhancing Image...");
+        const output = await replicate.run(
+            "lucataco/real-esrgan:c3e3916d403670753262f36714d842b969f9a770516b997b45c307f961963a07", 
+            { input: { image: imageUrl, scale: 4 } }
+        );
+
+        let upscaledUrl = Array.isArray(output) ? output[0] : output;
+        if (typeof upscaledUrl !== 'string') throw new Error("Upscale failed");
+
+        const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "enhanced_images" });
+        const finalUrl = uploadResult.secure_url;
+
+        user.credits -= 1;
+        await user.save();
+
+        await new Order({
+            userId, email, category: 'upscale', aiImageUrl: finalUrl, originalImageUrl: imageUrl, status: 'completed'
+        }).save();
+
+        res.json({ success: true, ai_image_url: finalUrl });
+    } catch (error) {
+        console.error("❌ [UPSCALE ERROR]:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });

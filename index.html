@@ -234,6 +234,12 @@
 
         <div class="flex flex-col gap-3">
             <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
+            
+            <!-- ✨ NEW: ENHANCE BUTTON -->
+            <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
+            </button>
+            
             <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try Another</button>
         </div>
     </div>
@@ -312,13 +318,93 @@
             } catch (error) { alert("Auth Error: " + error.message); }
         });
 
+        // --- NEW: ENHANCE/UPSCALE LOGIC ---
+
+        // 1. Handle Upscale for the Success Modal
+        window.handleUpscale = async function() {
+            const user = auth.currentUser;
+            const currentImageUrl = document.getElementById('resultImage').src;
+
+            if (!user) return alert("Please Login first!");
+            if (!currentImageUrl) return alert("No image to upscale!");
+
+            document.getElementById('loadingModal').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${BASE_URL}/upscale`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.uid,
+                        email: user.email,
+                        imageUrl: currentImageUrl
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('resultImage').src = result.ai_image_url;
+                    document.getElementById('downloadBtn').href = result.ai_image_url;
+                    alert("✨ Magic! Your photo is now Ultra-HD!");
+                } else {
+                    throw new Error(result.error || "Upscaling failed");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+            } finally {
+                document.getElementById('loadingModal').classList.add('hidden');
+            }
+        };
+
+        // 2. Handle Upscale for User Gallery
+        window.handleGalleryUpscale = async function(btn, imageUrl) {
+            const user = auth.currentUser;
+            if (!user) return alert("Please Login first!");
+
+            document.getElementById('loadingModal').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${BASE_URL}/upscale`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.uid,
+                        email: user.email,
+                        imageUrl: imageUrl
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update the specific image in the card
+                    const card = btn.closest('.bg-gray-800');
+                    const img = card.querySelector('img');
+                    img.src = result.ai_image_url;
+                    alert("✨ Photo Enhanced to 4K!");
+                } else {
+                    throw new Error(result.error || "Upscaling failed");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+            } finally {
+                document.getElementById('loadingModal').classList.add('hidden');
+            }
+        };
+
+        // Attach the Success Modal Button Listener
+        document.getElementById('enhanceBtn').onclick = window.handleUpscale;
+
+
+        // --- END ENHANCE LOGIC ---
+
         window.openMagicPrompt = () => document.getElementById('magicPromptModal').classList.remove('hidden');
         window.closeMagicPrompt = () => {
             document.getElementById('magicPromptModal').classList.add('hidden');
             document.getElementById('promptInput').value = ""; 
         };
 
-        // UPDATED: Magic Prompt Submit logic with Slider Fix
         document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
             const user = auth.currentUser;
             const promptText = document.getElementById('promptInput').value.trim();
@@ -342,11 +428,9 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Success! 
                     document.getElementById('resultImage').src = result.ai_image_url;
                     document.getElementById('downloadBtn').href = result.ai_image_url;
                     
-                    // MAGIC PROMPT MODE UI FIX: Hide slider elements
                     document.getElementById('successTitle').innerText = "Magic Done!";
                     document.getElementById('successSubtitle').innerText = "Your masterpiece is ready.";
                     document.getElementById('beforeImageWrapper').style.display = 'none';
@@ -469,6 +553,7 @@
         async function fetchUserPhotos(userId) {
             const grid = document.getElementById('photo-grid');
             const noPhotosMsg = document.getElementById('no-photos-msg');
+            
             try {
                 const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
                 const photos = await response.json();
@@ -478,7 +563,22 @@
                     photos.forEach(photo => {
                         const card = document.createElement('div');
                         card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                        card.innerHTML = `<div class="relative overflow-hidden"><img src="${photo.aiImageUrl}" class="w-full h-64 object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3"><a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a></div></div><div class="p-4"><div class="flex justify-between items-center"><span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span><span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span></div></div>`;
+                        card.innerHTML = `
+                            <div class="relative overflow-hidden group">
+                                <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col items-center justify-center gap-3">
+                                    <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-4 py-1.5 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a>
+                                    <button onclick="handleGalleryUpscale(this, '${photo.aiImageUrl}')" class="bg-amber-500 text-white px-4 py-1.5 rounded-full text-xs font-bold hover:bg-amber-600 transition flex items-center">
+                                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Enhance 4K
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
+                                    <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
+                                </div>
+                            </div>`;
                         grid.appendChild(card);
                     });
                 } else {
@@ -526,7 +626,6 @@
                 const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
                 const result = await response.json();
                 if (result.success) {
-                    // FACE-SWAP UI: SHOW SLIDER
                     document.getElementById('successTitle').innerText = "Magic Done!";
                     document.getElementById('successSubtitle').innerText = "Your professional photo is ready.";
                     document.getElementById('beforeImageWrapper').style.display = 'block';
