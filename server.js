@@ -261,7 +261,6 @@ app.post('/magic-prompt', async (req, res) => {
 });
 
 // --- NEW ROUTE: AI UPSCALE (ENHANCE TO 4K) ---
-// --- UPDATED ROUTE: AI UPSCALE (Fixing the 422 Error) ---
 app.post('/upscale', async (req, res) => {
     try {
         const { userId, email, imageUrl } = req.body;
@@ -270,12 +269,11 @@ app.post('/upscale', async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid request or no credits" });
         }
 
-        console.log("🚀 [UPSCALE] Starting Enhancement...");
+        console.log("🚀 [UPSCALE] Starting Enhancement using Real-ESRGAN-v2...");
 
-        // हमने यहाँ से लंबा Hash हटा दिया है और सिर्फ 'lucataco/real-esrgan' रखा है
-        // यह हमेशा लेटेस्ट वर्शन को इस्तेमाल करेगा और Error नहीं आएगा।
+        // Using the EXACT model and version from your Replicate URL
         const output = await replicate.run(
-            "lucataco/real-esrgan", 
+            "juergengunz/real-esrgan-v2:e4265d21c4770b339080060fab33e452d77b8ef3ee9781fec9cae81d1973a2cf", 
             { input: { image: imageUrl, scale: 4 } } 
         );
 
@@ -309,7 +307,7 @@ app.post('/upscale', async (req, res) => {
         res.json({ success: true, ai_image_url: finalUrl });
 
     } catch (error) {
-        console.error("❌ [UPSCSCALE ERROR]:", error.message);
+        console.error("❌ [UPSCALE ERROR]:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
