@@ -260,21 +260,24 @@ app.post('/magic-prompt', async (req, res) => {
     }
 });
 
-// --- NEW ROUTE: AI UPSCALE (ENHANCE TO 4K) ---
+// --- NEW ROUTE: AI UPSCALE (Enhance to 4K) ---
 app.post('/upscale', async (req, res) => {
     try {
         const { userId, email, imageUrl } = req.body;
+
+        // 1. Validation
         const user = await User.findOne({ firebaseUid: userId });
         if (!user || user.credits <= 0 || !imageUrl) {
-            return res.status(400).json({ success: false, error: "Invalid request or no credits" });
+            return res.status(400).json({ success: false, error: "Insufficient credits or missing image URL" });
         }
 
-        console.log("🚀 [UPSCALE] Starting Enhancement using Real-ESRGAN-v2...");
+        console.log("🚀 [UPSCALE] Starting Enhancement for image:", imageUrl);
 
-        // FIX: Changed scale from 4 to 2 to satisfy the model's validation requirements
+        // 2. Replicate AI Call (Real-ESRGAN model)
+        // scale: 4 का मतलब है इमेज को 4 गुना बड़ा और साफ़ करना
         const output = await replicate.run(
-            "juergengunz/real-esrgan-v2:e4265d21c4770b339080060fab33e452d77b8ef3ee9781fec9cae81d1973a2cf", 
-            { input: { image: imageUrl, scale: 2 } } 
+            "lucataco/real-esrgan:c3e3916d403670753262f36714d842b969f9a770516b997b45c307f961963a07", 
+            { input: { image: imageUrl, scale: 4 } }
         );
 
         let upscaledUrl = "";
@@ -283,28 +286,34 @@ app.post('/upscale', async (req, res) => {
         } else if (Array.isArray(output) && output.length > 0) {
             upscaledUrl = output[0];
         } else if (output && typeof output === 'object') {
-            upscaledUrl = output.url || output.href || output.output || "";
+            upsscaledUrl = output.url || output.href || output.output || "";
         }
 
         if (!upscaledUrl || !upscaledUrl.startsWith('http')) {
-            throw new Error("AI failed to upscale the image. Try again.");
+            throw new Error("AI failed to upscale the image.");
         }
 
-        // Cloudinary upload
+        // 3. Save the enhanced image to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "enhanced_images" });
-        const finalUrl = uploadResult.secure_url;
+        const finalEnhancedUrl = uploadResult.secure_url;
 
-        // Deduct credit
+        // 4. Deduct 1 Credit
         user.credits -= 1;
         await user.save();
 
-        // Save Order
-        await new Order({
-            userId, email, category: 'upscale', aiImageUrl: finalUrl, originalImageUrl: imageUrl, status: 'completed'
-        }).save();
+        // 5. Save the transaction as a new order
+        const newOrder = new Order({
+            userId,
+            email,
+            category: 'upscale',
+            aiImageUrl: finalEnhancedUrl,
+            originalImageUrl: imageUrl, // Reference to old image
+            status: 'completed'
+        });
+        await newOrder.save();
 
-        console.log("✅ [UPSCALE] Success! Final URL:", finalUrl);
-        res.json({ success: true, ai_image_url: finalUrl });
+        console.log("✅ [UPSCSCALE] Success! New URL:", finalEnhancedUrl);
+        res.json({ success: true, ai_image_url: finalEnhancedUrl });
 
     } catch (error) {
         console.error("❌ [UPSCALE ERROR]:", error.message);
