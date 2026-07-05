@@ -232,37 +232,45 @@
         </div>
     </div>
 
-    <!-- Success Modal -->
-    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
-            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
-            <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
-            <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-            
-            <div class="relative group mb-6">
-                <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                    <div class="after-image w-full h-full">
-                        <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Image+Error'">
-                    </div>
-                    <div id="beforeImageWrapper" class="before-image">
-                        <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Error'">
-                    </div>
-                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
-                    <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+    <!-- Success Modal (FIXED STRUCTURE) -->
+<div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
+        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
+        <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
+        <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
+        
+        <!-- Image Container -->
+        <div class="relative group mb-6">
+            <div class="comparison-container border-2 border-slate-100 shadow-inner">
+                <div class="after-image w-full h-full">
+                    <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Image+Error'">
                 </div>
-            </div>
-
-            <div class="flex flex-col gap-3">
-                <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
-                
-                <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
-                </button>
-
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try another way</button>
+                <div id="beforeImageWrapper" class="before-image">
+                    <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Error'">
+                </div>
+                <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
             </div>
         </div>
+
+        <!-- BUTTONS GROUP (ये हमेशा दिखेंगे) -->
+        <div class="flex flex-col gap-3">
+            <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
+                <i class="fa-solid fa-download mr-2"></i> Download
+            </a>
+            
+            <!-- Enhance Button -->
+            <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
+            </button>
+
+            <!-- THE "TRY ANOTHER WAY" BUTTON (यह अब हमेशा यहाँ रहेगा) -->
+            <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
+                Try another way
+            </button>
+        </div>
     </div>
+</div>
 
     <!-- Auth Modal -->
     <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
@@ -663,33 +671,53 @@
             startTimer(86400); 
         });
 
-        // --- NEW: UPSCALE FUNCTION ---
-        window.handleUpscale = async function() {
-            const user = auth.currentUser;
-            const currentImageUrl = document.getElementById('resultImage').src;
-            if (!user) return alert("Please Login first!");
-            if (!currentImageUrl || currentImageUrl.includes('placeholder')) return alert("No image found to upscale!");
-            document.getElementById('loadingModal').classList.remove('hidden');
-            try {
-                const response = await fetch(`${BASE_URL}/upscale`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.uid, email: user.email, imageUrl: currentImageUrl })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    alert("✨ Magic! Your photo is now Ultra-HD!");
-                } else {
-                    throw new Error(result.error || "Upscaling failed");
-                }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-            } finally {
-                document.getElementById('loadingModal').classList.add('hidden');
-            }
-        };
+        // --- UPDATED: Robust handleUpscale Function ---
+window.handleUpscale = async function() {
+    const user = auth.currentUser;
+    const currentImageUrl = document.getElementById('resultImage').src;
+
+    // basic validation
+    if (!user) return alert("Please Login first!");
+    if (!currentImageUrl || currentImageUrl.includes('placeholder')) {
+        return alert("No valid image found to upscale!");
+    }
+
+    // 1. Show Loading
+    document.getElementById('loadingModal').classList.remove('hidden');
+
+    try {
+        console.log("🚀 Starting Upscale...");
+        const response = await fetch(`${BASE_URL}/upscale`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.uid,
+                email: user.email,
+                imageUrl: currentImageUrl
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // 2. Update Image with High-Res version
+            document.getElementById('resultImage').src = result.ai_image_url;
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            alert("✨ Success! Your photo is now Ultra-HD!");
+        } else {
+            // 3. Handle API Errors gracefully
+            alert("❌ Upscale failed: " + (result.error || "Unknown error"));
+        }
+    } catch (error) {
+        // 4. Handle Network Errors
+        console.error("Upscale Error Details:", error);
+        alert("❌ Error: " + error.message);
+    } finally {
+        // 5. CRITICAL: Hide loading modal even if it fails
+        // इससे आपकी स्क्रीन कभी भी 'अटक' (freeze) नहीं होगी।
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+};
     </script>
 </body>
 </html>
