@@ -259,11 +259,7 @@
                 <i class="fa-solid fa-download mr-2"></i> Download
             </a>
             
-            <!-- Enhance Button -->
-            <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
-            </button>
-
+        
             <!-- THE "TRY ANOTHER WAY" BUTTON (यह अब हमेशा यहाँ रहेगा) -->
             <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
                 Try another way
@@ -671,53 +667,7 @@
             startTimer(86400); 
         });
 
-        // --- UPDATED: Robust handleUpscale Function ---
-window.handleUpscale = async function() {
-    const user = auth.currentUser;
-    const currentImageUrl = document.getElementById('resultImage').src;
-
-    // basic validation
-    if (!user) return alert("Please Login first!");
-    if (!currentImageUrl || currentImageUrl.includes('placeholder')) {
-        return alert("No valid image found to upscale!");
-    }
-
-    // 1. Show Loading
-    document.getElementById('loadingModal').classList.remove('hidden');
-
-    try {
-        console.log("🚀 Starting Upscale...");
-        const response = await fetch(`${BASE_URL}/upscale`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: user.uid,
-                email: user.email,
-                imageUrl: currentImageUrl
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            // 2. Update Image with High-Res version
-            document.getElementById('resultImage').src = result.ai_image_url;
-            document.getElementById('downloadBtn').href = result.ai_image_url;
-            alert("✨ Success! Your photo is now Ultra-HD!");
-        } else {
-            // 3. Handle API Errors gracefully
-            alert("❌ Upscale failed: " + (result.error || "Unknown error"));
-        }
-    } catch (error) {
-        // 4. Handle Network Errors
-        console.error("Upscale Error Details:", error);
-        alert("❌ Error: " + error.message);
-    } finally {
-        // 5. CRITICAL: Hide loading modal even if it fails
-        // इससे आपकी स्क्रीन कभी भी 'अटक' (freeze) नहीं होगी।
-        document.getElementById('loadingModal').classList.add('hidden');
-    }
-};
+        
     </script>
 </body>
 </html>

@@ -260,66 +260,7 @@ app.post('/magic-prompt', async (req, res) => {
     }
 });
 
-// --- NEW ROUTE: AI UPSCALE (Enhance to 4K) ---
-app.post('/upscale', async (req, res) => {
-    try {
-        const { userId, email, imageUrl } = req.body;
 
-        // 1. Validation
-        const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0 || !imageUrl) {
-            return res.status(400).json({ success: false, error: "Insufficient credits or missing image URL" });
-        }
-
-        console.log("🚀 [UPSCALE] Starting Enhancement for image:", imageUrl);
-
-        // 2. Replicate AI Call (Real-ESRGAN model)
-        // scale: 4 का मतलब है इमेज को 4 गुना बड़ा और साफ़ करना
-        const output = await replicate.run(
-            "lucataco/real-esrgan:c3e3916d403670753262f36714d842b969f9a770516b997b45c307f961963a07", 
-            { input: { image: imageUrl, scale: 4 } }
-        );
-
-        let upscaledUrl = "";
-        if (typeof output === 'string') {
-            upscaledUrl = output;
-        } else if (Array.isArray(output) && output.length > 0) {
-            upscaledUrl = output[0];
-        } else if (output && typeof output === 'object') {
-            upsscaledUrl = output.url || output.href || output.output || "";
-        }
-
-        if (!upscaledUrl || !upscaledUrl.startsWith('http')) {
-            throw new Error("AI failed to upscale the image.");
-        }
-
-        // 3. Save the enhanced image to Cloudinary
-        const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "enhanced_images" });
-        const finalEnhancedUrl = uploadResult.secure_url;
-
-        // 4. Deduct 1 Credit
-        user.credits -= 1;
-        await user.save();
-
-        // 5. Save the transaction as a new order
-        const newOrder = new Order({
-            userId,
-            email,
-            category: 'upscale',
-            aiImageUrl: finalEnhancedUrl,
-            originalImageUrl: imageUrl, // Reference to old image
-            status: 'completed'
-        });
-        await newOrder.save();
-
-        console.log("✅ [UPSCSCALE] Success! New URL:", finalEnhancedUrl);
-        res.json({ success: true, ai_image_url: finalEnhancedUrl });
-
-    } catch (error) {
-        console.error("❌ [UPSCALE ERROR]:", error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
 app.get('/my-photos', async (req, res) => {
     try {
