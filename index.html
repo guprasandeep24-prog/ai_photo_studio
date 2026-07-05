@@ -238,38 +238,37 @@
         </div>
     </div>
 
-    <!-- Success Modal -->
-    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
-            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
-            <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
-            <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-            
-            <div class="relative group mb-6">
-                <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                    <div class="after-image w-full h-full">
-                        <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl">
-                    </div>
-                    <div id="beforeImageWrapper" class="before-image">
-                        <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl">
-                    </div>
-                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
-                    <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+    <!-- Success Modal (FIXED STRUCTURE) -->
+<div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
+        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
+        <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
+        <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
+        
+        <div class="relative group mb-6">
+            <div class="comparison-container border-2 border-slate-100 shadow-inner">
+                <div class="after-image w-full h-full">
+                    <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Image+Error'">
                 </div>
-            </div>
-
-            <div class="flex flex-col gap-3">
-                <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
-                
-                <!-- NEW: ENHANCE BUTTON -->
-                <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center shadow-lg shadow-amber-500/30">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
-                </button>
-
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try another way</button>
+                <div id="beforeImageWrapper" class="before-image">
+                    <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Error'">
+                </div>
+                <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
             </div>
         </div>
+
+        <div class="flex flex-col gap-3">
+            <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> Download</a>
+            
+            <button id="enhanceBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Enhance to 4K ✨
+            </button>
+
+            <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Try another way</button>
+        </div>
     </div>
+</div>
 
     <!-- Auth Modal -->
     <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
@@ -287,385 +286,56 @@
             </div>
         </div>
     </div>
+// --- NEW & FIXED: Handle Upscale Function ---
+window.handleUpscale = async function() {
+    const user = auth.currentUser;
+    // ध्यान दें: यहाँ हम 'resultImage' का src ले रहे हैं
+    const currentImageUrl = document.getElementById('resultImage').src;
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    if (!user) return alert("Please Login first!");
+    
+    // अगर इमेज लोड नहीं हुई है या placeholder है, तो एरर दें
+    if (!currentImageUrl || currentImageUrl.includes('placeholder')) {
+        return alert("No valid image found to upscale!");
+    }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAB5Q7-Sj4rfBAeOT9iDJPpEAIR6JLRhDA",
-            authDomain: "ai-photo-studio-a8a34.firebaseapp.com",
-            projectId: "ai-photo-studio-a8a34",
-            storageBucket: "ai-photo-studio-a8a34.firebasestorage.app",
-            messagingSenderId: "416743083671",
-            appId: "1:416743083671:web:7733f0cb7a6af8c8667a3d2",
-            measurementId: "G-1EE8MG0DHL"
-        };
+    // 1. Loading Modal दिखाएँ
+    document.getElementById('loadingModal').classList.remove('hidden');
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
-
-        window.selectedCategory = ""; 
-        window.selectedGender = ""; 
-        window.selectedFile = null; 
-        window.originalImageUrl = ""; 
-        window.isLoginMode = true;
-        window.selectedTemplateIndex = null;
-        window.allTemplates = {};
-
-        window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
-        window.togglePricingModal = () => document.getElementById('pricingModal').classList.toggle('hidden');
+    try {
+        console.log("🚀 Starting Upscale Process for:", currentImageUrl);
         
-        window.switchAuthMode = () => {
-            window.isLoginMode = !window.isLoginMode;
-            document.getElementById('auth-title').innerText = window.isLoginMode ? "Welcome Back" : "Create Account";
-            document.getElementById('authSubmitBtn').innerText = window.isLoginMode ? "Login" : "Sign Up";
-            document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
-            document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
-        };
-
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('authEmail').value;
-            const password = document.getElementById('authPassword').value;
-            try {
-                if (window.isLoginMode) {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    const signUpResult = await createUserWithEmailAndPassword(auth, email, password);
-                    const newUser = signUpResult.user;
-                    await fetch(`${BASE_URL}/register`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: newUser.email, firebaseUid: newUser.uid })
-                    });
-                }
-                toggleAuthModal();
-            } catch (error) { alert("Auth Error: " + error.message); }
+        const response = await fetch(`${BASE_URL}/upscale`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.uid,
+                email: user.email,
+                imageUrl: currentImageUrl
+            })
         });
 
-        window.openMagicPrompt = () => document.getElementById('magicPromptModal').classList.remove('hidden');
-        window.closeMagicPrompt = () => {
-            document.getElementById('magicPromptModal').classList.add('hidden');
-            document.getElementById('promptInput').value = ""; 
-        };
+        const result = await response.json();
 
-        document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
-            const user = auth.currentUser;
-            const promptText = document.getElementById('promptInput').value.trim();
-            if (!user) return alert("Please Login first!");
-            if (!promptText) return alert("Please enter a prompt!");
-            document.getElementById('loadingModal').classList.remove('hidden');
-            try {
-                const response = await fetch(`${BASE_URL}/magic-prompt`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.uid, email: user.email, prompt: promptText })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successTitle').innerText = "Magic Done!";
-                    document.getElementById('successSubtitle').innerText = "Your masterpiece is ready.";
-                    document.getElementById('beforeImageWrapper').style.display = 'none';
-                    document.getElementById('sliderHandle').style.display = 'none';
-                    document.getElementById('comparisonSlider').style.display = 'none';
-                    closeMagicPrompt();
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    // Bind enhance button
-                    document.getElementById('enhanceBtn').onclick = window.handleUpscale;
-                } else {
-                    throw new Error(result.error || "Generation failed");
-                }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
-            }
-        });
-
-        window.handleLogout = async () => { await signOut(auth); location.reload(); };
-
-        async function fetchTemplatesFromServer() {
-            try {
-                const res = await fetch(`${BASE_URL}/templates`);
-                window.allTemplates = await res.json();
-            } catch (err) { console.error("❌ Failed to fetch templates:", err); }
+        if (result.success) {
+            // 2. Success: नई High-Res इमेज को Modal में अपडेट करें
+            document.getElementById('resultImage').src = result.ai_image_url;
+            document.getElementById('downloadBtn').href = result.ai_image_url;
+            
+            // यूजर को मैसेज दिखाएँ
+            alert("✨ Magic! Your photo is now Ultra-HD!");
+        } else {
+            // 3. API Error: अगर सर्वर से एरर आए
+            throw new Error(result.error || "Upscaling failed");
         }
-
-        window.displayTemplates = (category, gender) => {
-            const container = document.getElementById('template-selection-container');
-            const list = document.getElementById('template-list');
-            list.innerHTML = ""; 
-            const selectedList = window.allTemplates[category][gender];
-            if (selectedList && selectedList.length > 0) {
-                container.classList.remove('hidden');
-                selectedList.forEach((url, index) => {
-                    const imgDiv = document.createElement('div');
-                    imgDiv.className = `template-option rounded-xl overflow-hidden aspect-square bg-white/10 ${window.selectedTemplateIndex === index ? 'active' : ''}`;
-                    imgDiv.innerHTML = `<img src="${url}" class="w-full h-full object-cover" loading="lazy">`;
-                    imgDiv.onclick = () => selectTemplate(index);
-                    list.appendChild(imgDiv);
-                });
-            } else { container.classList.add('hidden'); }
-        };
-
-        window.selectTemplate = (index) => {
-            window.selectedTemplateIndex = index;
-            const options = document.querySelectorAll('.template-option');
-            options.forEach((opt, i) => {
-                if(i === index) opt.classList.add('active');
-                else opt.classList.remove('active');
-            });
-        };
-
-        window.selectCategory = (cat) => {
-            window.selectedCategory = cat; window.selectedGender = ""; window.selectedTemplateIndex = null;
-            document.getElementById('btn-man').classList.remove('active');
-            document.getElementById('btn-woman').classList.remove('active');
-            document.getElementById('template-selection-container').classList.add('hidden');
-            document.getElementById('upload-section').classList.remove('hidden');
-            document.getElementById('categories-section').classList.add('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-            document.getElementById('selected-cat-title').innerText = cat.toUpperCase() + " Mode";
-            fetchTemplatesFromServer();
-        };
-
-        window.selectGender = (gender) => {
-            window.selectedGender = gender; window.selectedTemplateIndex = null;
-            document.getElementById('btn-man').classList.toggle('active', gender === 'man');
-            document.getElementById('btn-woman').classList.toggle('active', gender === 'woman');
-            if (window.allTemplates[window.selectedCategory]) {
-                window.displayTemplates(window.selectedCategory, gender);
-            }
-        };
-
-        window.showUploadSection = () => {
-            document.getElementById('categories-section').classList.remove('hidden');
-            document.getElementById('dashboard-section').classList.add('hidden');
-            document.getElementById('upload-section').classList.add('hidden');
-            window.selectedCategory = ""; window.selectedGender = ""; window.selectedTemplateIndex = null;
-        };
-
-        window.hideUploadSection = () => {
-            document.getElementById('upload-section').classList.add('hidden');
-            document.getElementById('categories-section').classList.remove('hidden');
-        };
-
-        onAuthStateChanged(auth, async (user) => {
-            const authButtons = document.getElementById('auth-buttons');
-            const userProfile = document.getElementById('user-profile');
-            const userEmailSpan = document.getElementById('user-email');
-            const userCreditsSpan = document.getElementById('user-credits');
-            const categoriesSection = document.getElementById('categories-section');
-            const uploadSection = document.getElementById('upload-section');
-            const dashboardSection = document.getElementById('dashboard-section');
-
-            if (user) {
-                authButtons.classList.add('hidden');
-                userProfile.classList.remove('hidden');
-                userEmailSpan.innerText = user.email;
-                dashboardSection.classList.remove('hidden');
-                categoriesSection.classList.add('hidden');
-                uploadSection.classList.add('hidden');
-                try {
-                    const res = await fetch(`${BASE_URL}/user-profile/${user.uid}`);
-                    const data = await res.json();
-                    if(data.success) userCreditsSpan.innerText = data.credits;
-                } catch(e) { console.error(e); }
-                fetchUserPhotos(user.uid);
-            } else {
-                authButtons.classList.remove('hidden');
-                userProfile.classList.add('hidden');
-                dashboardSection.classList.add('hidden');
-                uploadSection.classList.add('hidden');
-                categoriesSection.classList.remove('hidden');
-            }
-        });
-
-        async function fetchUserPhotos(userId) {
-            const grid = document.getElementById('photo-grid');
-            const noPhotosMsg = document.getElementById('no-photos-msg');
-            try {
-                const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
-                const photos = await response.json();
-                if (photos && photos.length > 0) {
-                    noPhotosMsg.classList.add('hidden');
-                    grid.innerHTML = "";
-                    photos.forEach(photo => {
-                        const card = document.createElement('div');
-                        card.className = "bg-gray-800 rounded-xl overflow-hidden shadow-lg transform hover:scale-105 transition duration-300 border border-gray-700";
-                        card.innerHTML = `
-                            <div class="relative overflow-hidden">
-                                <img src="${photo.aiImageUrl}" class="w-full h-64 object-cover">
-                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center gap-3">
-                                    <a href="${photo.aiImageUrl}" target="_blank" class="bg-white text-black px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-500 hover:text-white transition">View Full</a>
-                                </div>
-                            </div>
-                            <div class="p-4">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs font-medium px-2 py-1 bg-gray-700 rounded text-gray-300 capitalize">${photo.category}</span>
-                                    <span class="text-[10px] text-gray-500">${new Date(photo.createdAt).toLocaleDateString()}</span>
-                                </div>
-                            </div>`;
-                        grid.appendChild(card);
-                    });
-                } else {
-                    noPhotosMsg.classList.remove('hidden');
-                    grid.innerHTML = "";
-                }
-            } catch (error) { console.error(error); }
-        }
-
-        document.getElementById('imageInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                window.selectedFile = file;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    document.getElementById('imagePreview').src = event.target.result;
-                    window.originalImageUrl = event.target.result; 
-                    document.getElementById('preview-container').classList.remove('hidden');
-                    document.getElementById('submitBtn').classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        document.getElementById('submitBtn').addEventListener('click', async function() {
-            const user = auth.currentUser;
-            if (!user) return alert("Please Login first!");
-            if (!window.selectedCategory) return alert("Please select a Category!");
-            if (!window.selectedGender) return alert("Please select Gender!");
-            if (window.selectedTemplateIndex === null) return alert("Please select a Style/Template!");
-            if (!window.selectedFile) return alert("Please select an image!");
-
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('email', user.email);
-            formData.append('category', window.selectedCategory);
-            formData.append('gender', window.selectedGender);
-            formData.append('templateIndex', window.selectedTemplateIndex); 
-            formData.append('image', window.selectedFile);
-
-            document.getElementById('loadingModal').classList.remove('hidden');
-
-            try {
-                const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('successTitle').innerText = "Magic Done!";
-                    document.getElementById('successSubtitle').innerText = "Your professional photo is ready.";
-                    document.getElementById('beforeImageWrapper').style.display = 'block';
-                    document.getElementById('sliderHandle').style.display = 'flex';
-                    document.getElementById('comparisonSlider').style.display = 'block';
-
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = window.originalImageUrl; 
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    // Bind Enhance button for Face-Swap
-                    document.getElementById('enhanceBtn').onclick = window.handleUpscale;
-
-                    const slider = document.getElementById('comparisonSlider');
-                    const beforeWrapper = document.getElementById('beforeImageWrapper');
-                    const handle = document.getElementById('sliderHandle');
-
-                    slider.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        beforeWrapper.style.width = `${val}%`;
-                        handle.style.left = `${val}%`;
-                    });
-                } else {
-                    throw new Error(result.error || "AI Generation failed");
-                }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                document.getElementById('loadingModal').classList.add('hidden');
-            }
-        });
-
-        window.startPayment = async (amount, credits) => {
-            const user = auth.currentUser;
-            if (!user) return alert("Please login first!");
-            try {
-                const response = await fetch(`${BASE_URL}/api/payments/create-order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount, userId: user.uid })
-                });
-                const data = await response.json();
-                if (!data.success) throw new Error(data.error);
-
-                const options = {
-                    key: "rzp_live_SyFwCLWlhzkird", 
-                    amount: amount * 100,
-                    currency: "INR",
-                    name: "AI Photo Studio",
-                    description: `${credits} AI Credits Plan`,
-                    order_id: data.order.id,
-                    handler: async function (res) {
-                        const verifyRes = await fetch(`${BASE_URL}/api/payments/verify-payment`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                razorpay_order_id: res.razorpay_order_id,
-                                razorpay_payment_id: res.razorpay_payment_id,
-                                razorpay_signature: res.razorpay_signature,
-                                userId: user.uid,
-                                email: user.email,
-                                creditsToAdd: credits
-                            })
-                        });
-                        const verifyData = await verifyRes.json();
-                        if (verifyData.success) { alert("🎉 Payment Successful!"); location.reload(); }
-                        else { alert("❌ Verification failed"); }
-                    },
-                    prefill: { email: user.email },
-                    theme: { color: "#4f46e5" }
-                };
-                const rzp = new Razorpay(options);
-                rzp.open();
-            } catch (error) { alert("❌ Payment Error: " + error.message); }
-        };
-
-        document.getElementById('loginBtn').addEventListener('click', () => toggleAuthModal());
-        document.getElementById('logoutBtn').addEventListener('click', () => handleLogout());
-        document.getElementById('closeAuthBtn').addEventListener('click', () => toggleAuthModal());
-        document.getElementById('auth-switch-btn').addEventListener('click', () => switchAuthMode());
-        window.scrollToCategories = () => {
-            const section = document.getElementById('categories-section');
-            section.classList.remove('hidden');
-            section.scrollIntoView({ behavior: 'smooth' });
-        };
-
-        function startTimer(durationInSeconds) {
-            let timer = durationInSeconds;
-            const display = document.querySelector('#countdown'); 
-            if (!display) return;
-            const interval = setInterval(function () {
-                let hours = Math.floor(timer / 3600);
-                let minutes = Math.floor((timer % 3600) / 60);
-                let seconds = Math.floor(timer % 60);
-                hours = hours < 10 ? "0" + hours : hours;
-                minutes = minutes < 10 ? "0" + minutes : minutes;
-                seconds = seconds < 10 ? "0" + seconds : seconds;
-                display.textContent = hours + ":" + minutes + ":" + seconds;
-                if (--timer < 0) {
-                    clearInterval(interval);
-                    display.textContent = "00:00:00";
-                }
-            }, 1000);
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            startTimer(86400); 
-        });
-
-    </script>
-</body>
+    } catch (error) {
+        // 4. Network/Critical Error
+        console.error("❌ Upscale Error Details:", error);
+        alert("❌ Error: " + error.message);
+    } finally {
+        // 5. सबसे ज़रूरी: चाहे काम सफल हो या फेल, Loading Modal को बंद करना ही है
+        document.getElementById('loadingModal').classList.add('hidden');
+    }
+};
+    </body>
 </html>
