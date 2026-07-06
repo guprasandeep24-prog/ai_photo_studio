@@ -97,57 +97,45 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- THE DETECTIVE VERSION: ULTRA-ROBUST HANDLER ---
+// --- THE FINAL & CORRECTED FUNCTION (REPLACE EVERYTHING) ---
+// ध्यान दें: यह पहली लाइन (async function...) सबसे महत्वपूर्ण है!
 async function handleReplicateStream(output, folder) {
-    // 1. सबसे पहले: जो भी जवाब आया है, उसे Raw रूप में Log करें ताकि हम देख सकें
-    console.log("🚀 [DEBUG] RAW AI RESPONSE RECEIVED:", JSON.stringify(output));
-
-    // 2. अगर AI ने खुद कोई Error भेजा है (जैसे: { "error": "something went wrong" })
-    if (output && typeof output === 'object' && output.error) {
-        console.error("❌ [AI ERROR DETECTED]:", output.error);
-        throw new Error("AI Engine Error: " + output.error);
-    }
-
-    // 3. अगर जवाब एक JSON String है (कभी-कभी API string में JSON भेजती है)
-    let parsedOutput = output;
-    if (typeof output === 'string' && (output.startsWith('{') || output.startsWith('['))) {
-        try {
-            parsedOutput = JSON.parse(output);
-            console.log("📝 [DEBUG] Successfully parsed JSON string");
-        } catch (e) {
-            // अगर JSON parse नहीं हुआ, तो इसे normal string ही रहने दें
-        }
-    }
-
-    // अब हम 'parsedOutput' का उपयोग करेंगे क्योंकि इसमें साफ़ डेटा मिल सकता है
     
-    // Case A: Direct URL String
-    if (typeof parsedOutput === 'string' && parsedOutput.startsWith('http')) {
-        return parsedOutput;
+    // 1. अगर output ही नहीं मिला (Null/Undefined)
+    if (output === undefined || output === null) {
+        console.error("❌ [CRITICAL] handleReplicateStream received null or undefined output");
+        throw new Error("AI returned no data (null/undefined)");
     }
 
-    // Case B: Array (जैसे [ "https://..." ])
-    if (Array.isArray(parsedOutput) && parsedOutput.length > 0) {
-        const url = parsedOutput.find(item => typeof item === 'string' && item.startsWith('http'));
+    // 2. अगर output एक सीधा URL स्ट्रिंग है
+    if (typeof output === 'string' && output.startsWith('http')) {
+        return output;
+    }
+
+    // 3. अगर output एक Array है (जैसे [ "https://..." ])
+    if (Array.isArray(output) && output.length > 0) {
+        const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
-    // Case C: Object (Deep Search Mode)
-    if (parsedOutput && typeof parsedOutput === 'object') {
-        // Common keys के जरिए ढूँढना
+    // 4. अगर output एक Object है (यहाँ आपका Error आ रहा था)
+    if (typeof output === 'object') {
+        console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
+
+        // Common keys के जरिए URL ढूँढना
         const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions', 'image_url'];
         for (const key of commonKeys) {
-            if (parsedOutput[key]) {
-                if (Array.isArray(parsedOutput[key])) {
-                    const found = parsedOutput[key].find(i => typeof i === 'string' && i.startsWith('http'));
+            if (output[key]) {
+                if (Array.isArray(output[key])) {
+                    const found = output[key].find(i => typeof i === 'string' && i.startsWith('http'));
                     if (found) return found;
-                } else if (typeof parsedOutput[key] === 'string' && parsedOutput[key].startsWith('http')) {
-                    return parsedOutput[key];
+                } else if (typeof output[key] === 'string' && output[key].startsWith('http')) {
+                    return output[key];
                 }
             }
         }
 
-        // Deep Recursive Search (अगर ऊपर के keys काम न करें)
+        // Deep Search: अगर ऊपर के keys काम न करें, तो पूरे object में गहराई से ढूँढना
         const findUrlDeep = (obj) => {
             for (let key in obj) {
                 if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
@@ -158,11 +146,11 @@ async function handleReplicateStream(output, folder) {
             }
             return null;
         };
-        const deepFound = findUrlDeep(parsedOutput);
+        const deepFound = findUrlDeep(output);
         if (deepFound) return deepFound;
     }
 
-    // Case D: Stream (Replicate standard)
+    // 5. अगर output एक Stream है (Replicate standard)
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -181,9 +169,8 @@ async function handleReplicateStream(output, folder) {
         }
     }
     
-    // अगर कुछ भी काम न करे, तो यह बताएगा कि आखिर मिला क्या था
-    console.error("❌ [CRITICAL ERROR] Could not find URL in response. Full response was:", JSON.stringify(output));
-    throw new Error("AI returned an unparseable format. Check Render logs for 'RAW AI RESPONSE'.");
+    console.error("❌ [CRITICAL ERROR] AI Response Format Unrecognized:", JSON.stringify(output));
+    throw new Error("AI returned an unparseable format. Check server logs.");
 }
     
     // Handle Object response
