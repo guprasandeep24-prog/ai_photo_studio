@@ -145,13 +145,22 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1">
+        <div class="grid grid-cols-1 gap-6">
             <div onclick="openMagicPrompt()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-indigo-500/30 hover:border-indigo-500 transition">
                 <div class="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </div>
                 <h3 class="text-2xl font-bold mb-1 text-white">✨ Magic Prompt Mode</h3>
                 <p class="text-slate-400 text-sm">Type anything and let AI create it from scratch!</p>
+            </div>
+
+            <!-- NEW TOOL: MAGIC PORTRAIT BUTTON -->
+            <div onclick="openMagicPortrait()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-pink-500/30 hover:border-pink-500 transition">
+                <div class="w-16 h-16 bg-pink-500/20 text-pink-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-user-astronaut"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-1 text-white">🎭 Magic Portrait</h3>
+                <p class="text-slate-400 text-sm">Upload your photo + Prompt to transform your identity!</p>
             </div>
         </div>
     </section>
@@ -164,6 +173,40 @@
             <p class="text-slate-400 mb-6">Describe your dream image in detail...</p>
             <textarea id="promptInput" rows="4" class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6" placeholder="e.g. A majestic lion wearing a crown in a neon cyberpunk city..."></textarea>
             <button id="magicSubmitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition">Generate Magic ✨</button>
+        </div>
+    </div>
+
+    <!-- NEW MODAL: MAGIC PORTRAIT -->
+    <div id="magicPortraitModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[150] p-4">
+        <div class="glass p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center border border-white/20">
+            <button onclick="closeMagicPortrait()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <h2 class="text-3xl font-bold mb-2 text-pink-400 pt-4">Magic Portrait</h2>
+            <p class="text-slate-400 mb-6">Upload your selfie and describe your new look!</p>
+            
+            <div class="space-y-6">
+                <!-- Upload Area -->
+                <div id="portrait-upload-wrapper" class="relative group cursor-pointer">
+                    <div id="portrait-preview-container" class="w-full h-48 rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden bg-black/20 group-hover:border-pink-500/50 transition-all duration-300">
+                        <div id="upload-placeholder" class="text-center p-4">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 group-hover:text-pink-400 transition-colors"></i>
+                            <p class="mt-2 text-sm text-gray-400">Click to Upload Photo</p>
+                        </div>
+                        <img id="portrait-image-preview" class="hidden w-full h-full object-cover" src="" alt="Preview">
+                        <button id="remove-portrait-btn" class="hidden absolute top-2 right-2 bg-red-500/80 text-white p-2 rounded-full transition-all">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <input type="file" id="portrait-file-input" class="hidden" accept="image/*">
+                </div>
+
+                <!-- Prompt Area -->
+                <textarea id="portrait-prompt-input" rows="3" class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all resize-none" placeholder="e.g. As a powerful Viking warrior in the mountains..."></textarea>
+                
+                <button id="generate-portrait-btn" class="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold rounded-2xl shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <span id="portrait-btn-text">Generate Portrait 🎭</span>
+                    <div id="portrait-btn-spinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -196,7 +239,7 @@
         </div>
     </section>
 
-    <!-- Modals -->
+    <!-- Modals (Pricing, Loading, Success, Auth) - UNCHANGED -->
     <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[200] p-4">
         <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
             <div class="bg-indigo-600 p-10 text-white md:w-1/3 flex flex-col justify-center">
@@ -232,43 +275,36 @@
         </div>
     </div>
 
-    <!-- Success Modal (FIXED STRUCTURE) -->
-<div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
-        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
-        <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
-        <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-        
-        <!-- Image Container -->
-        <div class="relative group mb-6">
-            <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                <div class="after-image w-full h-full">
-                    <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Image+Error'">
+    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
+            <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
+            <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
+            
+            <div class="relative group mb-6">
+                <div class="comparison-container border-2 border-slate-100 shadow-inner">
+                    <div class="after-image w-full h-full">
+                        <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Image+Error'">
+                    </div>
+                    <div id="beforeImageWrapper" class="before-image">
+                        <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Error'">
+                    </div>
+                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                    <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
                 </div>
-                <div id="beforeImageWrapper" class="before-image">
-                    <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Error'">
-                </div>
-                <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
-                <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
+                    <i class="fa-solid fa-download mr-2"></i> Download
+                </a>
+                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
+                    Try another way
+                </button>
             </div>
         </div>
-
-        <!-- BUTTONS GROUP (ये हमेशा दिखेंगे) -->
-        <div class="flex flex-col gap-3">
-            <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
-                <i class="fa-solid fa-download mr-2"></i> Download
-            </a>
-            
-        
-            <!-- THE "TRY ANOTHER WAY" BUTTON (यह अब हमेशा यहाँ रहेगा) -->
-            <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
-                Try another way
-            </button>
-        </div>
     </div>
-</div>
 
-    <!-- Auth Modal -->
     <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center z-[100] p-4">
         <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative text-slate-900">
             <button id="closeAuthBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
@@ -311,13 +347,16 @@
         window.selectedTemplateIndex = null;
         window.allTemplates = {};
 
+        // Magic Portrait State
+        window.portraitFile = null;
+
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
         window.togglePricingModal = () => document.getElementById('pricingModal').classList.toggle('hidden');
         
         window.switchAuthMode = () => {
             window.isLoginMode = !window.isLoginMode;
             document.getElementById('auth-title').innerText = window.isLoginMode ? "Welcome Back" : "Create Account";
-            document.getElementById('auth-submit-btn') ? null : (document.getElementById('authSubmitBtn').innerText = window.isLoginMode ? "Login" : "Sign Up");
+            document.getElementById('authSubmitBtn').innerText = window.isLoginMode ? "Login" : "Sign Up";
             document.getElementById('auth-toggle-text').innerText = window.isLoginMode ? "Don't have an account?" : "Already have an account?";
             document.getElementById('auth-switch-btn').innerText = window.isLoginMode ? "Sign Up" : "Login";
         };
@@ -348,6 +387,55 @@
             document.getElementById('promptInput').value = ""; 
         };
 
+        // [NEW] MAGIC PORTRAIT MODAL LOGIC
+        window.openMagicPortrait = () => document.getElementById('magicPortraitModal').classList.remove('hidden');
+        window.closeMagicPortrait = () => {
+            document.getElementById('magicPortraitModal').classList.add('hidden');
+            document.getElementById('portrait-prompt-input').value = "";
+            removePortraitPreview();
+        };
+
+        // Portrait Image Upload Preview
+        const portraitInput = document.getElementById('portrait-file-input');
+        const portraitPreviewImg = document.getElementById('portrait-image-preview');
+        const portraitPlaceholder = document.getElementById('upload-placeholder');
+        const removePortraitBtn = document.getElementById('remove-portrait-btn');
+        const portraitWrapper = document.getElementById('portrait-upload-wrapper');
+
+        portraitWrapper.onclick = () => {
+            if (!window.isLoginMode && !portraitFile) portraitInput.click(); 
+            else if (portraitFile) portraitInput.click();
+            else portraitInput.click();
+        };
+
+        portraitInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                window.portraitFile = file;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    portraitPreviewImg.src = event.target.result;
+                    portraitPreviewImg.classList.remove('hidden');
+                    portraitPlaceholder.classList.add('hidden');
+                    removePortraitBtn.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        function removePortraitPreview() {
+            window.portraitFile = null;
+            portraitPreviewImg.classList.add('hidden');
+            portraitPlaceholder.classList.remove('hidden');
+            removePortraitBtn.classList.add('hidden');
+            portraitInput.value = "";
+        }
+        removePortraitBtn.onclick = (e) => {
+            e.stopPropagation();
+            removePortraitPreview();
+        };
+
+        // Magic Prompt Submit
         document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
             const user = auth.currentUser;
             const promptText = document.getElementById('promptInput').value.trim();
@@ -366,18 +454,8 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successTitle').innerText = "Magic Done!";
-                    document.getElementById('successSubtitle').innerText = "Your masterpiece is ready.";
-                    document.getElementById('beforeImageWrapper').style.display = 'none';
-                    document.getElementById('sliderHandle').style.display = 'none';
-                    document.getElementById('comparisonSlider').style.display = 'none';
+                    showSuccessWithSlider(result.ai_image_url, null, "Magic Done!", "Your masterpiece is ready.", false);
                     closeMagicPrompt();
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    // Bind Enhance Button
-                    document.getElementById('enhanceBtn').onclick = window.handleUpscale;
                 } else {
                     throw new Error(result.error || "Generation failed");
                 }
@@ -387,6 +465,83 @@
             }
         });
 
+        // [NEW] Magic Portrait Submit
+        document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
+            const user = auth.currentUser;
+            const promptText = document.getElementById('portrait-prompt-input').value.trim();
+            if (!user) return alert("Please Login first!");
+            if (!window.portraitFile) return alert("Please upload a photo!");
+            if (!promptText) return alert("Please enter a prompt!");
+
+            document.getElementById('portrait-btn-text').classList.add('hidden');
+            document.getElementById('portrait-btn-spinner').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('userId', user.uid);
+            formData.append('email', user.email);
+            formData.append('prompt', promptText);
+            formData.append('image', window.portraitFile);
+
+            try {
+                const response = await fetch(`${BASE_URL}/magic-portrait`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccessWithSlider(result.ai_image_url, null, "Magic Portrait!", "Your identity has transformed!", false);
+                    closeMagicPortrait();
+                } else {
+                    throw new Error(result.error || "Generation failed");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+                document.getElementById('portrait-btn-text').classList.remove('hidden');
+                document.getElementById('portrait-btn-spinner').classList.add('hidden');
+                document.getElementById('loadingModal').classList.add('hidden');
+            } finally {
+                document.getElementById('portrait-btn-text').classList.remove('hidden');
+                document.getElementById('portrait-btn-spinner').classList.add('hidden');
+            }
+        });
+
+        // Helper for Success Modal (Handles Slider Logic)
+        function showSuccessWithSlider(aiUrl, originalUrl, title, subtitle, showSlider) {
+            document.getElementById('loadingModal').classList.add('hidden');
+            document.getElementById('resultImage').src = aiUrl;
+            document.getElementById('downloadBtn').href = aiUrl;
+            document.getElementById('successTitle').innerText = title;
+            document.getElementById('successSubtitle').innerText = subtitle;
+            
+            const beforeWrapper = document.getElementById('beforeImageWrapper');
+            const handle = document.getElementById('sliderHandle');
+            const slider = document.getElementById('comparisonSlider');
+
+            if (showSlider && originalUrl) {
+                beforeWrapper.style.display = 'block';
+                handle.style.display = 'flex';
+                slider.style.display = 'block';
+                document.getElementById('originalImagePreview').src = originalUrl;
+                
+                // Bind Slider Events
+                slider.oninput = (e) => {
+                    const val = e.target.value;
+                    beforeWrapper.style.width = `${val}%`;
+                    handle.style.left = `${val}%`;
+                };
+            } else {
+                beforeWrapper.style.display = 'none';
+                handle.style.display = 'none';
+                slider.style.display = 'none';
+            }
+            
+            document.getElementById('successModal').classList.remove('hidden');
+        }
+
+        // REST OF THE ORIGINAL JS (Unchanged & preserved)
         window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
         async function fetchTemplatesFromServer() {
@@ -557,30 +712,7 @@
                 const response = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
                 const result = await response.json();
                 if (result.success) {
-                    document.getElementById('successTitle').innerText = "Magic Done!";
-                    document.getElementById('successSubtitle').innerText = "Your professional photo is ready.";
-                    document.getElementById('beforeImageWrapper').style.display = 'block';
-                    document.getElementById('sliderHandle').style.display = 'flex';
-                    document.getElementById('comparisonSlider').style.display = 'block';
-
-                    document.getElementById('resultImage').src = result.ai_image_url;
-                    document.getElementById('originalImagePreview').src = window.originalImageUrl; 
-                    document.getElementById('downloadBtn').href = result.ai_image_url;
-                    document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('loadingModal').classList.add('hidden');
-                    
-                    // Bind Enhance button for Face-Swap
-                    document.getElementById('enhanceBtn').onclick = window.handleUpscale;
-
-                    const slider = document.getElementById('comparisonSlider');
-                    const beforeWrapper = document.getElementById('beforeImageWrapper');
-                    const handle = document.getElementById('sliderHandle');
-
-                    slider.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        beforeWrapper.style.width = `${val}%`;
-                        handle.style.left = `${val}%`;
-                    });
+                    showSuccessWithSlider(result.ai_image_url, window.originalImageUrl, "Magic Done!", "Your professional photo is ready.", true);
                 } else {
                     throw new Error(result.error || "AI Generation failed");
                 }
@@ -666,8 +798,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             startTimer(86400); 
         });
-
-        
     </script>
 </body>
 </html>

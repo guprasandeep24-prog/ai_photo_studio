@@ -97,7 +97,40 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- AI CORE LOGIC ---
+// --- AI CORE LOGIC (REUSABLE STREAM HANDLER) ---
+async function handleReplicateStream(output, folder) {
+    if (typeof output === 'string' && output.startsWith('http')) return output;
+    if (Array.isArray(output) && output.length > 0) return output[0];
+    
+    // Handle Stream for high-end models
+    if (output && typeof output[Symbol.asyncIterator] === 'function') {
+        const chunks = [];
+        for await (const chunk of output) { 
+            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); 
+        }
+        const buffer = Buffer.concat(chunks);
+        const contentString = buffer.toString().trim();
+        
+        if (contentString.startsWith('http')) return contentString;
+        if (buffer.length > 0) {
+            const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream({ folder }, (error, result) => {
+                    if (error) reject(error); else resolve(result);
+                }).end(buffer);
+            });
+            return uploadResult.secure_url;
+        }
+    }
+    
+    // Handle Object response
+    if (output && typeof output === 'object') {
+        const url = output.output || output.url || output.image || output.href;
+        if (typeof url === 'string' && url.startsWith('http')) return url;
+    }
+    
+    throw new Error("AI returned unparseable format");
+}
+
 async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
     try {
@@ -105,30 +138,7 @@ async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
-
-        if (typeof output === 'string' && output.startsWith('http')) return output;
-        if (Array.isArray(output) && output.length > 0) return output[0];
-        if (output && typeof output === 'object') {
-            const urlFromObj = output.output || output.url || output.image;
-            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
-        }
-        
-        if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            const chunks = [];
-            for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
-            const buffer = Buffer.concat(chunks);
-            const contentString = buffer.toString().trim();
-            if (contentString.startsWith('http')) return contentString;
-            if (buffer.length > 0) {
-                const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
-                        if (error) reject(error); else resolve(result);
-                    }).end(buffer);
-                });
-                return uploadResult.secure_url;
-            }
-        }
-        throw new Error("AI returned unparseable format");
+        return await handleReplicateStream(output, "ai_studio_faceswap");
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
@@ -166,6 +176,57 @@ app.get('/user-profile/:userId', async (req, res) => {
         }
         res.json({ success: true, credits: user.credits, email: user.email });
     } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// [NEW] MAGIC PORTRAIT ROUTE (Identity + Prompt)
+app.post('/magic-portrait', upload.single('image'), async (req, res) => {
+    try {
+        const { userId, email, prompt } = req.body;
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user || user.credits <= 0 || !prompt || !req.file) {
+            return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
+        }
+
+        console.log("✨ [MAGIC PORTRAIT] Generating for:", email);
+        
+        // 1. Upload User Selfie to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
+        const userImageUrl = uploadResult.secure_url;
+
+        // 2. Run InstantID Model (High-End Identity Preservation)
+        // Note: Using lucataco/instantid as a robust alternative
+        const output = await replicate.run(
+            "lucataco/instantid:15664860e897963f33018f33c4023204874a55026374c5225630e6179e9b0c5c",
+            { 
+                input: { 
+                    image: userImageUrl,
+                    prompt: prompt,
+                    negative_prompt: "low quality, blurry, distorted face",
+                    identity_strength: 0.8,
+                    adapter_strength: 0.8
+                }
+            }
+        );
+
+        const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
+
+        // 3. Deduct Credits & Save Order
+        user.credits -= 1;
+        await user.save();
+
+        const newOrder = new Order({
+            userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: userImageUrl, status: 'completed'
+        });
+        await newOrder.save();
+
+        if (req.file) fs.unlinkSync(req.file.path);
+        res.json({ success: true, ai_image_url: finalImageUrl });
+
+    } catch (error) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        console.error("❌ [MAGIC PORTRAIT ERROR]:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -219,44 +280,20 @@ app.post('/magic-prompt', async (req, res) => {
         console.log("✨ [MAGIC PROMPT] Generating:", prompt);
         const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
 
-        let finalImageUrl = "";
-        let target = Array.isArray(output) ? output[0] : output;
-
-        if (typeof target === 'string' && target.startsWith('http')) {
-            finalImageUrl = target;
-        } else if (target && typeof target[Symbol.asyncIterator] === 'function') {
-            const chunks = [];
-            for await (const chunk of target) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
-            const buffer = Buffer.concat(chunks);
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
-                    if (error) reject(error); else resolve(result);
-                }).end(buffer);
-            });
-            finalImageUrl = uploadResult.secure_url;
-        } else if (target && typeof target === 'object') {
-            finalImageUrl = target.url || target.href || target.output || "";
-        }
-
-        if (!finalImageUrl) throw new Error("Failed to get image URL");
-
-        let permanentUrl = finalImageUrl;
-        if (!finalImageUrl.includes('cloudinary.com')) {
-            const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
-            permanentUrl = uploadResult.secure_url;
-        }
+        const finalImageUrl = await handleReplicateStream(output, "magic_prompts");
 
         user.credits -= 1;
         await user.save();
 
         const newOrder = new Order({
-            userId, email, category: 'magic-prompt', aiImageUrl: permanentUrl, originalImageUrl: "", status: 'completed'
+            userId, email, category: 'magic-prompt', aiImageUrl: finalImageUrl, originalImageUrl: "", status: 'completed'
         });
         await newOrder.save();
 
-        res.json({ success: true, ai_image_url: permanentUrl });
+        res.json({ success: true, ai_image_url: finalImageUrl });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+   
     }
 });
 
