@@ -199,7 +199,7 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         // 2. Run the STABLE InstantID Model
         // We are using 'zsxkib/instantid' which is currently active and stable
         const output = await replicate.run(
-            "zsxkib/instantid",   // Using full version ID for maximum stability
+            "zedge/instantid:ba2d5293be8794a05841a6f6eed81e810340142c3c25fab4838ff2b5d9574420",   // Using full version ID for maximum stability
             // NOTE: If the above long ID fails, use the simple string below:
             // "zsxkib/instantid", 
             { 
