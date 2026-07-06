@@ -180,11 +180,12 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [NEW] MAGIC PORTRAIT ROUTE (Identity + Prompt)
+// [UPDATED] MAGIC PORTRAIT ROUTE (Fixed Version Issue)
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
+        
         if (!user || user.credits <= 0 || !prompt || !req.file) {
             return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
         }
@@ -195,21 +196,22 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run InstantID Model (High-End Identity Preservation)
-        // Note: Using lucataco/instantid as a robust alternative
+        // 2. Run InstantID Model 
+        // FIXED: Removed the specific version hash to use the latest stable version
         const output = await replicate.run(
-            "lucataco/instantid:15664860e897963f33018f33c4023204874a55026374c5225630e6179e9b0c5c",
+            "lucataco/instantid", // <--- हमने यहाँ से वो लंबा नंबर हटा दिया है
             { 
                 input: { 
                     image: userImageUrl,
                     prompt: prompt,
-                    negative_prompt: "low quality, blurry, distorted face",
+                    negative_prompt: "low quality, blurry, distorted face, bad anatomy, extra fingers",
                     identity_strength: 0.8,
                     adapter_strength: 0.8
                 }
             }
         );
 
+        // Handle the output stream/url
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
         // 3. Deduct Credits & Save Order
