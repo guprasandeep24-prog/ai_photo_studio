@@ -97,21 +97,56 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- IMPROVED & ROBUST REUSABLE STREAM HANDLER ---
+// --- ULTRA-ROBUST REUSABLE STREAM HANDLER ---
 async function handleReplicateStream(output, folder) {
     // Case 1: It's already a direct URL string
     if (typeof output === 'string' && output.startsWith('http')) {
         return output;
     }
 
-    // Case 2: It's an array of strings (URLs)
-    if (Array.isArray(output) && output.length > 0) {
-        if (typeof output[0] === 'string' && output[0].startsWith('http')) {
-            return output[0];
-        }
+    // Case 2: It's an array (we take the first valid URL)
+    if (Array.isArray(output)) {
+        const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
+        if (url) return url;
     }
 
-    // Case 3: It's a Stream (Async Iterator)
+    // Case 3: It's an Object (Deep Search Mode)
+    if (output && typeof output === 'object') {
+        console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
+
+        // Method A: Check standard keys
+        const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions'];
+        for (const key of commonKeys) {
+            if (output[key]) {
+                // If the key contains an array, search inside it
+                if (Array.isArray(output[key])) {
+                    const found = output[key].find(i => typeof i === 'string' && i.startsWith('http'));
+                    if (found) return found;
+                } 
+                // If the key is a string
+                else if (typeof output[key] === 'string' && output[key].startsWith('http')) {
+                    return output[key];
+                }
+            }
+        }
+
+        // Method B: Recursive Deep Search (अगर कुछ भी काम न करे)
+        // यह पूरे Object में कहीं भी 'http' ढूँढेगा
+        const findUrlDeep = (obj) => {
+            for (let key in obj) {
+                if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    const found = findUrlDeep(obj[key]);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+        const deepFound = findUrlDeep(output);
+        if (deepFound) return deepFound;
+    }
+
+    // Case 4: It's a Stream
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -119,7 +154,6 @@ async function handleReplicateStream(output, folder) {
         }
         const buffer = Buffer.concat(chunks);
         const contentString = buffer.toString().trim();
-        
         if (contentString.startsWith('http')) return contentString;
         if (buffer.length > 0) {
             const uploadResult = await new Promise((resolve, reject) => {
@@ -129,30 +163,9 @@ async function handleReplicateStream(output, folder) {
             });
             return uploadResult.secure_url;
         }
-    
-
-    // Case 4: It's an Object (Deep Search for URL)
-    if (output && typeof output === 'object') {
-        console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
-        
-        // Try common keys first
-        const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url'];
-        for (const key of commonKeys) {
-            if (output[key] && typeof output[key] === 'string' && output[key].startsWith('http')) {
-                return output[key];
-            }
-        }
-
-        // If common keys fail, perform a Deep Search through all values
-        for (const key in output) {
-            if (typeof output[key] === 'string' && output[key].startsWith('http')) {
-                return output[key];
-            }
-        }
     }
     
-    // If all else fails, log exactly what we got to help debugging
-    console.error("❌ [CRITICAL ERROR] AI Response Format Unrecognized:", output);
+    console.error("❌ [CRITICAL ERROR] AI Response Format Unrecognized:", JSON.stringify(output));
     throw new Error("AI returned an unparseable format. Check server logs.");
 }
     
@@ -163,7 +176,7 @@ async function handleReplicateStream(output, folder) {
     }
     
     throw new Error("AI returned unparseable format");
-}
+
 
 async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
@@ -243,7 +256,9 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             }
         );
 
-        // This will now use the smarter handler
+        // यहाँ हम output को प्रिंट कर रहे हैं ताकि अगली बार अगर एरर आए तो हमें असली डेटा दिखे
+        console.log("📥 [DEBUG] Raw Output from Replicate:", JSON.stringify(output));
+
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
         user.credits -= 1;
