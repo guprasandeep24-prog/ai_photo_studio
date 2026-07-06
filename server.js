@@ -97,41 +97,44 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- ULTRA-ROBUST REUSABLE STREAM HANDLER ---
+// --- ULTRA-ROBUST REUSABLE STREAM HANDLER (CORRECTED) ---
+// ध्यान दें: यहाँ (output, folder) होना बहुत ज़रूरी है, वरना 'output is not defined' एरर आएगा।
 async function handleReplicateStream(output, folder) {
+    // अगर output खाली या undefined है, तो एरर दें
+    if (output === undefined || output === null) {
+        console.error("❌ [CRITICAL] handleReplicateStream received null or undefined output");
+        throw new Error("AI returned no data (null/undefined)");
+    }
+
     // Case 1: It's already a direct URL string
     if (typeof output === 'string' && output.startsWith('http')) {
         return output;
     }
 
     // Case 2: It's an array (we take the first valid URL)
-    if (Array.isArray(output)) {
+    if (Array.isArray(output) && output.length > 0) {
         const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
     // Case 3: It's an Object (Deep Search Mode)
-    if (output && typeof output === 'object') {
+    if (typeof output === 'object') {
         console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
 
         // Method A: Check standard keys
         const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions'];
         for (const key of commonKeys) {
             if (output[key]) {
-                // If the key contains an array, search inside it
                 if (Array.isArray(output[key])) {
                     const found = output[key].find(i => typeof i === 'string' && i.startsWith('http'));
                     if (found) return found;
-                } 
-                // If the key is a string
-                else if (typeof output[key] === 'string' && output[key].startsWith('http')) {
+                } else if (typeof output[key] === 'string' && output[key].startsWith('http')) {
                     return output[key];
                 }
             }
         }
 
         // Method B: Recursive Deep Search (अगर कुछ भी काम न करे)
-        // यह पूरे Object में कहीं भी 'http' ढूँढेगा
         const findUrlDeep = (obj) => {
             for (let key in obj) {
                 if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
@@ -146,7 +149,7 @@ async function handleReplicateStream(output, folder) {
         if (deepFound) return deepFound;
     }
 
-    // Case 4: It's a Stream
+    // Case 4: It's a Stream (Async Iterator)
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
