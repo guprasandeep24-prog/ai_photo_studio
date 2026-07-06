@@ -97,12 +97,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- AI CORE LOGIC (REUSABLE STREAM HANDLER) ---
+// --- IMPROVED & ROBUST REUSABLE STREAM HANDLER ---
 async function handleReplicateStream(output, folder) {
-    if (typeof output === 'string' && output.startsWith('http')) return output;
-    if (Array.isArray(output) && output.length > 0) return output[0];
-    
-    // Handle Stream for high-end models
+    // Case 1: It's already a direct URL string
+    if (typeof output === 'string' && output.startsWith('http')) {
+        return output;
+    }
+
+    // Case 2: It's an array of strings (URLs)
+    if (Array.isArray(output) && output.length > 0) {
+        if (typeof output[0] === 'string' && output[0].startsWith('http')) {
+            return output[0];
+        }
+    }
+
+    // Case 3: It's a Stream (Async Iterator)
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -120,7 +129,32 @@ async function handleReplicateStream(output, folder) {
             });
             return uploadResult.secure_url;
         }
+    
+
+    // Case 4: It's an Object (Deep Search for URL)
+    if (output && typeof output === 'object') {
+        console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
+        
+        // Try common keys first
+        const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url'];
+        for (const key of commonKeys) {
+            if (output[key] && typeof output[key] === 'string' && output[key].startsWith('http')) {
+                return output[key];
+            }
+        }
+
+        // If common keys fail, perform a Deep Search through all values
+        for (const key in output) {
+            if (typeof output[key] === 'string' && output[key].startsWith('http')) {
+                return output[key];
+            }
+        }
     }
+    
+    // If all else fails, log exactly what we got to help debugging
+    console.error("❌ [CRITICAL ERROR] AI Response Format Unrecognized:", output);
+    throw new Error("AI returned an unparseable format. Check server logs.");
+}
     
     // Handle Object response
     if (output && typeof output === 'object') {
@@ -186,27 +220,21 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
-        
         if (!user || user.credits <= 0 || !prompt || !req.file) {
             return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
         }
 
         console.log("✨ [MAGIC PORTRAIT] Starting for:", email);
         
-        // 1. Upload User Selfie to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // DEBUG: Check if URL is being generated correctly
-        console.log("📸 [DEBUG] Uploaded Image URL:", userImageUrl);
-
-        // 2. Run the ZEDGE InstantID Model
-        // IMPORTANT: For this model, the key MUST be 'input_image', not 'image'
+        // Run the ZEDGE model
         const output = await replicate.run(
             "zedge/instantid:ba2d5293be8794a05841a6f6eed81e810340142c3c25fab4838ff2b5d9574420",
             { 
                 input: { 
-                    input_image: userImageUrl, // <--- यहाँ हमने 'image' को बदलकर 'input_image' कर दिया है
+                    input_image: userImageUrl, 
                     prompt: prompt,
                     negative_prompt: "low quality, blurry, distorted face, bad anatomy, extra fingers, deformed, ugly",
                     identity_strength: 0.8,
@@ -215,10 +243,9 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             }
         );
 
-        // Handle the output stream/url
+        // This will now use the smarter handler
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
-        // 3. Deduct Credits & Save Order
         user.credits -= 1;
         await user.save();
 
@@ -236,6 +263,7 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
