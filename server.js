@@ -180,7 +180,8 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [FIXED] MAGIC PORTRAIT ROUTE (Using Stable Model: zsxkib/instantid)
+
+// [FINAL FIXED] MAGIC PORTRAIT ROUTE (Using zedge/instantid with correct parameter)
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -190,21 +191,22 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
         }
 
-        console.log("✨ [MAGIC PORTRAIT] Generating for:", email);
+        console.log("✨ [MAGIC PORTRAIT] Starting for:", email);
         
         // 1. Upload User Selfie to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run the STABLE InstantID Model
-        // We are using 'zsxkib/instantid' which is currently active and stable
+        // DEBUG: Check if URL is being generated correctly
+        console.log("📸 [DEBUG] Uploaded Image URL:", userImageUrl);
+
+        // 2. Run the ZEDGE InstantID Model
+        // IMPORTANT: For this model, the key MUST be 'input_image', not 'image'
         const output = await replicate.run(
-            "zedge/instantid:ba2d5293be8794a05841a6f6eed81e810340142c3c25fab4838ff2b5d9574420",   // Using full version ID for maximum stability
-            // NOTE: If the above long ID fails, use the simple string below:
-            // "zsxkib/instantid", 
+            "zedge/instantid:ba2d5293be8794a05841a6f6eed81e810340142c3c25fab4838ff2b5d9574420",
             { 
                 input: { 
-                    image: userImageUrl,
+                    input_image: userImageUrl, // <--- यहाँ हमने 'image' को बदलकर 'input_image' कर दिया है
                     prompt: prompt,
                     negative_prompt: "low quality, blurry, distorted face, bad anatomy, extra fingers, deformed, ugly",
                     identity_strength: 0.8,
@@ -213,7 +215,7 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             }
         );
 
-        // Since we are using a specific version, we handle output carefully
+        // Handle the output stream/url
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
         // 3. Deduct Credits & Save Order
@@ -234,7 +236,6 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
