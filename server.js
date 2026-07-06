@@ -97,31 +97,31 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- ULTRA-ROBUST REUSABLE STREAM HANDLER (CORRECTED) ---
-// ध्यान दें: यहाँ (output, folder) होना बहुत ज़रूरी है, वरना 'output is not defined' एरर आएगा।
+// --- ULTRA-ROBUST REUSABLE STREAM HANDLER (FIXED) ---
+// यह पूरा ब्लॉक एक साथ पेस्ट करें। 'output' यहाँ पैरामीटर के रूप में डिफाइन है।
 async function handleReplicateStream(output, folder) {
-    // अगर output खाली या undefined है, तो एरर दें
+    // 1. अगर output बिलकुल ही नहीं मिला (undefined/null)
     if (output === undefined || output === null) {
         console.error("❌ [CRITICAL] handleReplicateStream received null or undefined output");
         throw new Error("AI returned no data (null/undefined)");
     }
 
-    // Case 1: It's already a direct URL string
+    // 2. अगर output पहले से ही एक URL स्ट्रिंग है
     if (typeof output === 'string' && output.startsWith('http')) {
         return output;
     }
 
-    // Case 2: It's an array (we take the first valid URL)
+    // 3. अगर output एक Array है (जैसे [ "https://..." ])
     if (Array.isArray(output) && output.length > 0) {
         const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
-    // Case 3: It's an Object (Deep Search Mode)
+    // 4. अगर output एक Object है (यहाँ आपका Error आ रहा था)
     if (typeof output === 'object') {
         console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
 
-        // Method A: Check standard keys
+        // Common keys के जरिए URL ढूँढना
         const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions'];
         for (const key of commonKeys) {
             if (output[key]) {
@@ -134,7 +134,7 @@ async function handleReplicateStream(output, folder) {
             }
         }
 
-        // Method B: Recursive Deep Search (अगर कुछ भी काम न करे)
+        // Deep Search: अगर ऊपर के keys काम न करें, तो पूरे object में गहराई से ढूँढना
         const findUrlDeep = (obj) => {
             for (let key in obj) {
                 if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
@@ -149,7 +149,7 @@ async function handleReplicateStream(output, folder) {
         if (deepFound) return deepFound;
     }
 
-    // Case 4: It's a Stream (Async Iterator)
+    // 5. अगर output एक Stream है (Replicate का Default behavior)
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -157,7 +157,9 @@ async function handleReplicateStream(output, folder) {
         }
         const buffer = Buffer.concat(chunks);
         const contentString = buffer.toString().trim();
+        
         if (contentString.startsWith('http')) return contentString;
+        
         if (buffer.length > 0) {
             const uploadResult = await new Promise((resolve, reject) => {
                 cloudinary.uploader.upload_stream({ folder }, (error, result) => {
