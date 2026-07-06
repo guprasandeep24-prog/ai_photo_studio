@@ -465,48 +465,58 @@
             }
         });
 
-        // [NEW] Magic Portrait Submit
-        document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
-            const user = auth.currentUser;
-            const promptText = document.getElementById('portrait-prompt-input').value.trim();
-            if (!user) return alert("Please Login first!");
-            if (!window.portraitFile) return alert("Please upload a photo!");
-            if (!promptText) return alert("Please enter a prompt!");
+        // [FIXED] Magic Portrait Submit with 'finally' block
+document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
+    const user = auth.currentUser;
+    const promptText = document.getElementById('portrait-prompt-input').value.trim();
 
-            document.getElementById('portrait-btn-text').classList.add('hidden');
-            document.getElementById('portrait-btn-spinner').classList.remove('hidden');
-            document.getElementById('loadingModal').classList.remove('hidden');
+    // 1. Basic Validations
+    if (!user) return alert("Please Login first!");
+    if (!window.portraitFile) return alert("Please upload a photo!");
+    if (!promptText) return alert("Please enter a prompt!");
 
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('email', user.email);
-            formData.append('prompt', promptText);
-            formData.append('image', window.portraitFile);
+    // 2. SHOW LOADER (Start spinning)
+    document.getElementById('portrait-btn-text').classList.add('hidden');
+    document.getElementById('portrait-btn-spinner').classList.remove('hidden');
+    document.getElementById('loadingModal').classList.remove('hidden'); // Full screen loader
 
-            try {
-                const response = await fetch(`${BASE_URL}/magic-portrait`, {
-                    method: 'POST',
-                    body: formData
-                });
+    const formData = new FormData();
+    formData.append('userId', user.uid);
+    formData.append('email', user.email);
+    formData.append('prompt', promptText);
+    formData.append('image', window.portraitFile);
 
-                const result = await response.json();
-
-                if (result.success) {
-                    showSuccessWithSlider(result.ai_image_url, null, "Magic Portrait!", "Your identity has transformed!", false);
-                    closeMagicPortrait();
-                } else {
-                    throw new Error(result.error || "Generation failed");
-                }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                document.getElementById('portrait-btn-text').classList.remove('hidden');
-                document.getElementById('portrait-btn-spinner').classList.add('hidden');
-                document.getElementById('loadingModal').classList.add('hidden');
-            } finally {
-                document.getElementById('portrait-btn-text').classList.remove('hidden');
-                document.getElementById('portrait-btn-spinner').classList.add('hidden');
-            }
+    try {
+        // 3. API CALL
+        const response = await fetch(`${BASE_URL}/magic-portrait`, {
+            method: 'POST',
+            body: formData
         });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Success: Show the result
+            showSuccessWithSlider(result.ai_image_url, null, "Magic Portrait!", "Your identity has transformed!", false);
+            closeMagicPortrait();
+        } else {
+            // API returned an error (like insufficient credits)
+            throw new Error(result.error || "Generation failed");
+        }
+
+    } catch (error) {
+        // 4. ERROR HANDLING
+        console.error("❌ Portrait Error:", error.message);
+        alert("❌ Error: " + error.message);
+
+    } finally {
+        // 5. ALWAYS HIDE LOADER (This stops the "round-round" spinning)
+        // यह ब्लॉक तब भी चलेगा चाहे काम सफल हो या एरर आए।
+        document.getElementById('loadingModal').classList.add('hidden'); 
+        document.getElementById('portrait-btn-text').classList.remove('hidden');
+        document.getElementById('portrait-btn-spinner').classList.add('hidden');
+    }
+});
 
         // Helper for Success Modal (Handles Slider Logic)
         function showSuccessWithSlider(aiUrl, originalUrl, title, subtitle, showSlider) {
