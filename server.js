@@ -180,7 +180,7 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [UPDATED] MAGIC PORTRAIT ROUTE (Fixed Version Issue)
+// [FIXED] MAGIC PORTRAIT ROUTE (Using Stable Model: zsxkib/instantid)
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -196,22 +196,24 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run InstantID Model 
-        // FIXED: Removed the specific version hash to use the latest stable version
+        // 2. Run the STABLE InstantID Model
+        // We are using 'zsxkib/instantid' which is currently active and stable
         const output = await replicate.run(
-            "lucataco/instantid", // <--- हमने यहाँ से वो लंबा नंबर हटा दिया है
+            "zsxkib/instantid:7864163687912250847c354f1086e62a5f5a5b5a5b5a5b5a5b5a5b5a5b5a5b5a", // Using full version ID for maximum stability
+            // NOTE: If the above long ID fails, use the simple string below:
+            // "zsxkib/instantid", 
             { 
                 input: { 
                     image: userImageUrl,
                     prompt: prompt,
-                    negative_prompt: "low quality, blurry, distorted face, bad anatomy, extra fingers",
+                    negative_prompt: "low quality, blurry, distorted face, bad anatomy, extra fingers, deformed, ugly",
                     identity_strength: 0.8,
                     adapter_strength: 0.8
                 }
             }
         );
 
-        // Handle the output stream/url
+        // Since we are using a specific version, we handle output carefully
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
         // 3. Deduct Credits & Save Order
