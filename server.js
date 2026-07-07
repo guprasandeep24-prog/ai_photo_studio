@@ -97,28 +97,23 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- THE ONLY CORRECT VERSION OF THIS FUNCTION ---
+// --- ULTRA-ROBUST REUSABLE STREAM HANDLER (DETECTION ENGINE) ---
 async function handleReplicateStream(output, folder) {
-    // 1. Check if output exists
     if (output === undefined || output === null) {
-        console.error("❌ [CRITICAL] handleReplicateStream received null or undefined output");
-        throw new Error("AI returned no data (null/undefined)");
+        console.error("❌ [CRITICAL] handleReplicateStream received null/undefined");
+        throw new Error("AI returned no data.");
     }
 
-    // 2. If it's a direct URL string
-    if (typeof output === 'string' && output.startsWith('http')) {
-        return output;
-    }
+    console.log("🚀 [DEBUG] RAW AI RESPONSE RECEIVED:", JSON.stringify(output));
 
-    // 3. If it's an array
+    if (typeof output === 'string' && output.startsWith('http')) return output;
+
     if (Array.isArray(output) && output.length > 0) {
         const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
-    // 4. If it's an object (The part causing your error)
     if (typeof output === 'object') {
-        console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
         const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions', 'image_url'];
         for (const key of commonKeys) {
             if (output[key]) {
@@ -144,7 +139,6 @@ async function handleReplicateStream(output, folder) {
         if (deepFound) return deepFound;
     }
 
-    // 5. If it's a Stream
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -163,17 +157,8 @@ async function handleReplicateStream(output, folder) {
         }
     }
     
-    throw new Error("AI returned an unparseable format.");
+    throw new Error("AI returned an unparseable format. Check logs.");
 }
-    
-    // Handle Object response
-    if (output && typeof output === 'object') {
-        const url = output.output || output.url || output.image || output.href;
-        if (typeof url === 'string' && url.startsWith('http')) return url;
-    }
-    
-    throw new Error("AI returned unparseable format");
-
 
 async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
@@ -201,7 +186,6 @@ app.post('/register', async (req, res) => {
         if (!user) {
             user = new User({ firebaseUid, email, credits: 5 });
             await user.save();
-            console.log(`🆕 [NEW USER] Registered: ${email}`);
         }
         res.json({ success: true });
     } catch (error) {
@@ -224,8 +208,6 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-
-// [FINAL FIXED] MAGIC PORTRAIT ROUTE (Using zedge/instantid with correct parameter)
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -235,11 +217,9 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         }
 
         console.log("✨ [MAGIC PORTRAIT] Starting for:", email);
-        
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // Run the ZEDGE model
         const output = await replicate.run(
             "zedge/instantid:ba2d5293be8794a05841a6f6eed81e810340142c3c25fab4838ff2b5d9574420",
             { 
@@ -252,9 +232,6 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
                 }
             }
         );
-
-        // यहाँ हम output को प्रिंट कर रहे हैं ताकि अगली बार अगर एरर आए तो हमें असली डेटा दिखे
-        console.log("📥 [DEBUG] Raw Output from Replicate:", JSON.stringify(output));
 
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
@@ -280,16 +257,10 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user) return res.status(404).json({ success: false, error: "User not found" });
-        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
-        if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+        if (!user || user.credits <= 0 || !req.file) return res.status(400).json({ success: false, error: "Invalid request" });
         
         const selectedTemplates = TEMPLATES[category][gender];
-        const idx = parseInt(templateIndex);
-        if (!selectedTemplates || idx < 0 || idx >= selectedTemplates.length) {
-            return res.status(400).json({ success: false, error: "Invalid Template" });
-        }
-        const targetImageUrl = selectedTemplates[idx];
+        const targetImageUrl = selectedTemplates[parseInt(templateIndex)];
 
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
@@ -300,8 +271,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         await user.save();
 
         const newOrder = new Order({
-            userId, email, category, gender,
-            aiImageUrl, originalImageUrl, status: 'completed'
+            userId, email, category, gender, aiImageUrl, originalImageUrl, status: 'completed'
         });
         await newOrder.save();
 
@@ -318,13 +288,9 @@ app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0 || !prompt) {
-            return res.status(400).json({ success: false, error: "Invalid request or no credits" });
-        }
+        if (!user || user.credits <= 0 || !prompt) return res.status(400).json({ success: false, error: "Invalid request" });
 
-        console.log("✨ [MAGIC PROMPT] Generating:", prompt);
         const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
-
         const finalImageUrl = await handleReplicateStream(output, "magic_prompts");
 
         user.credits -= 1;
@@ -338,11 +304,8 @@ app.post('/magic-prompt', async (req, res) => {
         res.json({ success: true, ai_image_url: finalImageUrl });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
-   
     }
 });
-
-
 
 app.get('/my-photos', async (req, res) => {
     try {
