@@ -154,7 +154,6 @@
                 <p class="text-slate-400 text-sm">Type anything and let AI create it from scratch!</p>
             </div>
 
-            <!-- NEW TOOL: MAGIC PORTRAIT BUTTON -->
             <div onclick="openMagicPortrait()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-pink-500/30 hover:border-pink-500 transition">
                 <div class="w-16 h-16 bg-pink-500/20 text-pink-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
                     <i class="fa-solid fa-user-astronaut"></i>
@@ -176,7 +175,7 @@
         </div>
     </div>
 
-    <!-- NEW MODAL: MAGIC PORTRAIT -->
+    <!-- MAGIC PORTRAIT MODAL -->
     <div id="magicPortraitModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[150] p-4">
         <div class="glass p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center border border-white/20">
             <button onclick="closeMagicPortrait()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
@@ -184,7 +183,6 @@
             <p class="text-slate-400 mb-6">Upload your selfie and describe your new look!</p>
             
             <div class="space-y-6">
-                <!-- Upload Area -->
                 <div id="portrait-upload-wrapper" class="relative group cursor-pointer">
                     <div id="portrait-preview-container" class="w-full h-48 rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden bg-black/20 group-hover:border-pink-500/50 transition-all duration-300">
                         <div id="upload-placeholder" class="text-center p-4">
@@ -199,7 +197,6 @@
                     <input type="file" id="portrait-file-input" class="hidden" accept="image/*">
                 </div>
 
-                <!-- Prompt Area -->
                 <textarea id="portrait-prompt-input" rows="3" class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all resize-none" placeholder="e.g. As a powerful Viking warrior in the mountains..."></textarea>
                 
                 <button id="generate-portrait-btn" class="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold rounded-2xl shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2">
@@ -239,7 +236,7 @@
         </div>
     </section>
 
-    <!-- Modals (Pricing, Loading, Success, Auth) - UNCHANGED -->
+    <!-- Modals -->
     <div id="pricingModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[200] p-4">
         <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
             <div class="bg-indigo-600 p-10 text-white md:w-1/3 flex flex-col justify-center">
@@ -347,7 +344,6 @@
         window.selectedTemplateIndex = null;
         window.allTemplates = {};
 
-        // Magic Portrait State
         window.portraitFile = null;
 
         window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
@@ -387,7 +383,6 @@
             document.getElementById('promptInput').value = ""; 
         };
 
-        // [NEW] MAGIC PORTRAIT MODAL LOGIC
         window.openMagicPortrait = () => document.getElementById('magicPortraitModal').classList.remove('hidden');
         window.closeMagicPortrait = () => {
             document.getElementById('magicPortraitModal').classList.add('hidden');
@@ -395,7 +390,6 @@
             removePortraitPreview();
         };
 
-        // Portrait Image Upload Preview
         const portraitInput = document.getElementById('portrait-file-input');
         const portraitPreviewImg = document.getElementById('portrait-image-preview');
         const portraitPlaceholder = document.getElementById('upload-placeholder');
@@ -403,9 +397,7 @@
         const portraitWrapper = document.getElementById('portrait-upload-wrapper');
 
         portraitWrapper.onclick = () => {
-            if (!window.isLoginMode && !portraitFile) portraitInput.click(); 
-            else if (portraitFile) portraitInput.click();
-            else portraitInput.click();
+            portraitInput.click();
         };
 
         portraitInput.onchange = (e) => {
@@ -465,60 +457,51 @@
             }
         });
 
-        // [FIXED] Magic Portrait Submit with 'finally' block
-document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
-    const user = auth.currentUser;
-    const promptText = document.getElementById('portrait-prompt-input').value.trim();
+        // MAGIC PORTRAIT SUBMIT (Upgraded with FormData)
+        document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
+            const user = auth.currentUser;
+            const promptText = document.getElementById('portrait-prompt-input').value.trim();
 
-    // 1. Basic Validations
-    if (!user) return alert("Please Login first!");
-    if (!window.portraitFile) return alert("Please upload a photo!");
-    if (!promptText) return alert("Please enter a prompt!");
+            if (!user) return alert("Please Login first!");
+            if (!window.portraitFile) return alert("Please upload a photo!");
+            if (!promptText) return alert("Please enter a prompt!");
 
-    // 2. SHOW LOADER (Start spinning)
-    document.getElementById('portrait-btn-text').classList.add('hidden');
-    document.getElementById('portrait-btn-spinner').classList.remove('hidden');
-    document.getElementById('loadingModal').classList.remove('hidden'); // Full screen loader
+            document.getElementById('portrait-btn-text').classList.add('hidden');
+            document.getElementById('portrait-btn-spinner').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.remove('hidden'); 
 
-    const formData = new FormData();
-    formData.append('userId', user.uid);
-    formData.append('email', user.email);
-    formData.append('prompt', promptText);
-    formData.append('image', window.portraitFile);
+            const formData = new FormData();
+            formData.append('userId', user.uid);
+            formData.append('email', user.email);
+            formData.append('prompt', promptText);
+            formData.append('image', window.portraitFile);
 
-    try {
-        // 3. API CALL
-        const response = await fetch(`${BASE_URL}/magic-portrait`, {
-            method: 'POST',
-            body: formData
+            try {
+                const response = await fetch(`${BASE_URL}/magic-portrait`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccessWithSlider(result.ai_image_url, null, "Magic Portrait!", "Your identity has transformed!", false);
+                    closeMagicPortrait();
+                } else {
+                    throw new Error(result.error || "Generation failed");
+                }
+
+            } catch (error) {
+                console.error("❌ Portrait Error:", error.message);
+                alert("❌ Error: " + error.message);
+
+            } finally {
+                document.getElementById('loadingModal').classList.add('hidden'); 
+                document.getElementById('portrait-btn-text').classList.remove('hidden');
+                document.getElementById('portrait-btn-spinner').classList.add('hidden');
+            }
         });
 
-        const result = await response.json();
-
-        if (result.success) {
-            // Success: Show the result
-            showSuccessWithSlider(result.ai_image_url, null, "Magic Portrait!", "Your identity has transformed!", false);
-            closeMagicPortrait();
-        } else {
-            // API returned an error (like insufficient credits)
-            throw new Error(result.error || "Generation failed");
-        }
-
-    } catch (error) {
-        // 4. ERROR HANDLING
-        console.error("❌ Portrait Error:", error.message);
-        alert("❌ Error: " + error.message);
-
-    } finally {
-        // 5. ALWAYS HIDE LOADER (This stops the "round-round" spinning)
-        // यह ब्लॉक तब भी चलेगा चाहे काम सफल हो या एरर आए।
-        document.getElementById('loadingModal').classList.add('hidden'); 
-        document.getElementById('portrait-btn-text').classList.remove('hidden');
-        document.getElementById('portrait-btn-spinner').classList.add('hidden');
-    }
-});
-
-        // Helper for Success Modal (Handles Slider Logic)
         function showSuccessWithSlider(aiUrl, originalUrl, title, subtitle, showSlider) {
             document.getElementById('loadingModal').classList.add('hidden');
             document.getElementById('resultImage').src = aiUrl;
@@ -536,7 +519,6 @@ document.getElementById('generate-portrait-btn').addEventListener('click', async
                 slider.style.display = 'block';
                 document.getElementById('originalImagePreview').src = originalUrl;
                 
-                // Bind Slider Events
                 slider.oninput = (e) => {
                     const val = e.target.value;
                     beforeWrapper.style.width = `${val}%`;
@@ -551,7 +533,6 @@ document.getElementById('generate-portrait-btn').addEventListener('click', async
             document.getElementById('successModal').classList.remove('hidden');
         }
 
-        // REST OF THE ORIGINAL JS (Unchanged & preserved)
         window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
         async function fetchTemplatesFromServer() {

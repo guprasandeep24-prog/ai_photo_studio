@@ -97,72 +97,66 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- ULTRA-ROBUST REUSABLE STREAM HANDLER (DETECTION ENGINE) ---
+// --- ULTIMATE ROBUST REPLICATE STREAM HANDLER ---
 async function handleReplicateStream(output, folder) {
-    if (output === undefined || output === null) {
-        console.error("❌ [CRITICAL] handleReplicateStream received null/undefined");
-        throw new Error("AI returned no data.");
-    }
+    if (!output) throw new Error("AI returned no data.");
 
-    console.log("🚀 [DEBUG] RAW AI RESPONSE RECEIVED:", JSON.stringify(output));
-
+    // 1. If it's already a direct URL string
     if (typeof output === 'string' && output.startsWith('http')) return output;
 
-    if (Array.isArray(output) && output.length > 0) {
+    // 2. If it's an array of strings
+    if (Array.isArray(output)) {
         const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
-    if (typeof output === 'object') {
-        const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions', 'image_url'];
-        for (const key of commonKeys) {
-            if (output[key]) {
-                if (Array.isArray(output[key])) {
-                    const found = output[key].find(i => typeof i === 'string' && i.startsWith('http'));
-                    if (found) return found;
-                } else if (typeof output[key] === 'string' && output[key].startsWith('http')) {
-                    return output[key];
-                }
-            }
-        }
-        const findUrlDeep = (obj) => {
-            for (let key in obj) {
-                if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
-                if (typeof obj[key] === 'object' && obj[key] !== null) {
-                    const found = findUrlDeep(obj[key]);
-                    if (found) return found;
-                }
-            }
-            return null;
-        };
-        const deepFound = findUrlDeep(output);
-        if (deepFound) return deepFound;
-    }
-
+    // 3. If it's a stream (Pattern: for await...of)
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
             chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); 
         }
         const buffer = Buffer.concat(chunks);
+        
+        // Check if buffer is a URL string (rare but possible)
         const contentString = buffer.toString().trim();
         if (contentString.startsWith('http')) return contentString;
-        if (buffer.length > 0) {
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder }, (error, result) => {
-                    if (error) reject(error); else resolve(result);
-                }).end(buffer);
-            });
-            return uploadResult.secure_url;
-        }
+
+        // Otherwise, upload actual image buffer to Cloudinary
+        return new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                { folder: folder },
+                (error, result) => {
+                    if (error) reject(error);
+                    else resolve(result.secure_url);
+                }
+            );
+            uploadStream.end(buffer);
+        });
     }
-    
-    throw new Error("AI returned an unparseable format. Check logs.");
+
+    // 4. DEEP SEARCH for nested objects
+    const findUrlDeep = (obj) => {
+        if (typeof obj === 'string' && obj.startsWith('http')) return obj;
+        if (typeof obj === 'object' && obj !== null) {
+            for (let key in obj) {
+                const found = findUrlDeep(obj[key]);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    const deepFound = findUrlDeep(output);
+    if (deepFound) return deepFound;
+
+    throw new Error("AI response format not recognized. Check logs.");
 }
 
 async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
     try {
+        // Keep existing version hash as requested to not break old features
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
@@ -208,52 +202,56 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [STABLE PRODUCTION VERSION] MAGIC PORTRAIT ROUTE
-// हम अब Stability AI के आधिकारिक मॉडल का उपयोग कर रहे हैं जो कभी 404 नहीं देता।
+/**
+ * MAGIC PORTRAIT ROUTE (UPGRADED)
+ * Goal: Keep face (identity) and change style via Prompt.
+ * Model: tencentarc/photomaker (using slug for stability)
+ */
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
-   
-     const user = await User.findOne({ firebaseUid: userId });
+        const user = await User.findOne({ firebaseUid: userId });
+
         if (!user || user.credits <= 0 || !prompt || !req.file) {
-            return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
+            return res.status(400).json({ success: false, error: "Insufficient credits or missing data" });
         }
 
-        console.log("✨ [MAGIC PORTRAIT] Starting Stable Transformation for:", email);
-        
-   
+        console.log(`✨ [MAGIC PORTRAIT] User: ${email} | Prompt: ${prompt}`);
+
+        // 1. Upload user's original selfie to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run Official Stability AI SDXL (Image-to-Image)
-        // यह मॉडल दुनिया का सबसे भरोसेमंद मॉडल है। यह 404 कभी नहीं देगा।
-        console.log("🤖 [AI] Calling Official SDXL Model...");
+        // 2. Call Photomaker via Replicate (Slug based)
         const output = await replicate.run(
-            "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea5355252099903990a055b111", 
+            "tencentarc/photomaker", 
             { 
                 input: { 
-                    prompt: prompt,
-                    image: userImageUrl,       // आपकी फोटो
-                    prompt_strength: 0.6,      // 0.6 का मतलब: चेहरा आपका रहेगा, पर स्टाइल प्रॉम्प्ट वाला होगा (Perfect Balance!)
-                    refine: "expert_ensemble_refiner",
-                    apply_watermark: false
+                    input_image: userImageUrl, 
+                    prompt: `${prompt}, highly detailed, cinematic lighting, masterwork, high resolution`, 
+                    num_outputs: 1,
+                    guidance_scale: 7.5,
+                    num_inference_steps: 50
                 }
             }
         );
 
-        // 3. Extract URL using our robust handler
+        // 3. Robustly handle stream to get final URL
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
-        // 4. Deduct Credits & Save Order
+        // 4. Credit Management
         user.credits -= 1;
         await user.save();
 
+        // 5. Order Logging
         const newOrder = new Order({
             userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: userImageUrl, status: 'completed'
         });
         await newOrder.save();
 
+        // Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
+
         res.json({ success: true, ai_image_url: finalImageUrl });
 
     } catch (error) {
