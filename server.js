@@ -203,49 +203,67 @@ app.get('/user-profile/:userId', async (req, res) => {
 });
 
 /**
- * MAGIC PORTRAIT ROUTE (UPGRADED)
- * Goal: Keep face (identity) and change style via Prompt.
- * Model: tencentarc/photomaker (using slug for stability)
+ * [FIXED] MAGIC PORTRAIT ROUTE 
+ * Model: stability-ai/sdxl (Using Slug ONLY for 100% Stability)
+ * Logic: Img2Img via prompt_strength to preserve identity.
  */
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
 
+        // 1. Validations
         if (!user || user.credits <= 0 || !prompt || !req.file) {
-            return res.status(400).json({ success: false, error: "Insufficient credits or missing data" });
+            return res.status(400).json({ 
+                success: false, 
+                error: "Insufficient credits or missing image/prompt" 
+            });
         }
 
-        console.log(`✨ [MAGIC PORTRAIT] User: ${email} | Prompt: ${prompt}`);
+        console.log(`✨ [MAGIC PORTRAIT] Identity Preservation Mode | User: ${email}`);
 
-        // 1. Upload user's original selfie to Cloudinary
+        // 2. Upload original selfie to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Call Photomaker via Replicate (Slug based)
+        /**
+         * 3. CALL STABLE SDXL MODEL
+         * Kyuki Photomaker bina hash ke 404 de raha tha, 
+         * hum SDXL use karenge jo "Slug" support karta hai.
+         * prompt_strength 0.5 - 0.6 is the MAGIC range.
+         * 0.5 = User's face remains mostly the same.
+         * 0.8 = Face changes too much.
+         */
+        console.log("🤖 [AI] Running SDXL Img2Img with Identity Preservation...");
+        
         const output = await replicate.run(
-            "tencentarc/photomaker", 
+            "stability-ai/sdxl", // Clean Model Slug - NO HASH
             { 
                 input: { 
-                    input_image: userImageUrl, 
-                    prompt: `${prompt}, highly detailed, cinematic lighting, masterwork, high resolution`, 
-                    num_outputs: 1,
-                    guidance_scale: 7.5,
-                    num_inference_steps: 50
+                    prompt: prompt,
+                    image: userImageUrl,       // User ki original photo
+                    prompt_strength: 0.55,     // MAGIC NUMBER: Face ko maintain rakhta hai
+                    refine: "expert_ensemble_refiner",
+                    apply_watermark: false,
+                    scheduler: "K_EULER"
                 }
             }
         );
 
-        // 3. Robustly handle stream to get final URL
+        // 4. Extract URL using our robust handler
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
-        // 4. Credit Management
+        // 5. Credits & Order management
         user.credits -= 1;
         await user.save();
 
-        // 5. Order Logging
         const newOrder = new Order({
-            userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: userImageUrl, status: 'completed'
+            userId, 
+            email, 
+            category: 'magic-portrait', 
+            aiImageUrl: finalImageUrl, 
+            originalImageUrl: userImageUrl, 
+            status: 'completed'
         });
         await newOrder.save();
 
