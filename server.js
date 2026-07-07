@@ -208,7 +208,7 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [FINAL FIXED] MAGIC PORTRAIT ROUTE (Switching to Highly Stable PhotoMaker)
+// [FINAL STABLE VERSION] MAGIC PORTRAIT ROUTE (Using Model Name only)
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -223,13 +223,13 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run TENCENTARC PHOTOMAKER (Industry Standard for Identity)
-        // This model is extremely stable and always returns a valid URL.
+        // 2. Run PhotoMaker (Using Model Name without Version Hash)
+        // We are calling the model by name only to get the latest stable version
         const output = await replicate.run(
-            "tencentarc/photomaker:dd011460ad93330736518998f1745a163843907c5361b7f39d498a4e05973583",
+            "tencentarc/photomaker", // <--- NO VERSION HASH HERE! This prevents 422 errors.
             { 
                 input: { 
-                    input_image: userImageUrl,
+                    input_image: userImageUrl, 
                     prompt: prompt,
                     guidance_scale: 7.5,
                     num_inference_steps: 50
