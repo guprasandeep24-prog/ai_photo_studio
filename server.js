@@ -15,16 +15,11 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// --- 🏗️ ARCHITECT'S CONFIGURATION (CENTRALIZED AI MODELS) ---
-// Yahan humne model hashes ko rakh liya hai taaki main code "Clean" rahe.
-// Ye versions permanent hote hain, ye expire nahi honge.
+// ✅ FIXED: Using ONLY clean model slugs as per your instruction
 const AI_MODELS = {
-    // Identity preservation ke liye Photomaker best hai
-    MAGIC_PORTRAIT: "tencentarc/photomaker:ddfc2b6a4b0900405e5563a312d29c906b37d1952ec74e6a51a6d20a72494f9a",
-    // Faceswap ke liye
-    FACESWAP: "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00",
-    // Prompt se nayi image ke liye (Very Fast)
-    MAGIC_PROMPT: "black-forest-labs/flux-schnell"
+    MAGIC_PORTRAIT: "tencentarc/photomaker", 
+    FACESWAP: "lucataco/faceswap", 
+    MAGIC_PROMPT: "stability-ai/sdxl"
 };
 
 // --- MIDDLEWARES ---
@@ -195,10 +190,6 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-/**
- * [FIXED] MAGIC PORTRAIT ROUTE
- * Purpose: Upload selfie + prompt -> New style, Same Face.
- */
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -208,25 +199,28 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             return res.status(400).json({ success: false, error: "Insufficient credits or missing data" });
         }
 
-        console.log(`✨ [MAGIC PORTRAIT] User: ${email} | Prompt: ${prompt}`);
-
-        // 1. Upload original photo
+        // 1. Upload original photo to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. AI Magic (Using Photomaker via Config constant)
+        console.log(`✨ [MAGIC PORTRAIT] Calling: ${AI_MODELS.MAGIC_PORTRAIT}`);
+
+        // 2. AI Magic (Using Photomaker with CLEAN SLUG)
+        // We use the slug, and Replicate will automatically fetch the LATEST version.
         const output = await replicate.run(AI_MODELS.MAGIC_PORTRAIT, { 
             input: { 
                 input_image: userImageUrl, 
-                prompt: `${prompt}, cinematic lighting, high quality, 8k, highly detailed`, 
-                num_outputs: 1
+                prompt: prompt, 
+                num_outputs: 1,
+                guidance_scale: 7.5,
+                guidance_scale_image: 100 // Photomaker specific for identity strength
             } 
         });
 
-        // 3. Save to Cloudinary
+        // 3. Save to Cloudinary using our robust handler
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
-        // 4. Update Credits & Order
+        // 4. Deduct Credit & Record Order
         user.credits -= 1;
         await user.save();
 
