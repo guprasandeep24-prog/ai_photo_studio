@@ -208,11 +208,12 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [FINAL STABLE VERSION] MAGIC PORTRAIT ROUTE (Using Model Name only)
+// [FINAL SUCCESSFUL VERSION] MAGIC PORTRAIT ROUTE
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
+        
         if (!user || user.credits <= 0 || !prompt || !req.file) {
             return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
         }
@@ -223,21 +224,22 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run PhotoMaker (Using Model Name without Version Hash)
-        // We are calling the model by name only to get the latest stable version
+        // 2. Run PhotoMaker (Using the most stable slug: lucataco/photomaker)
+        // We are using the model name directly to ensure we get the latest stable version.
+        console.log("🤖 [AI] Calling Replicate PhotoMaker...");
         const output = await replicate.run(
-            "tencentarc/photomaker", // <--- NO VERSION HASH HERE! This prevents 422 errors.
+            "lucataco/photomaker", 
             { 
                 input: { 
-                    input_image: userImageUrl, 
+                    input_image: userImageUrl, // PhotoMaker requires 'input_image'
                     prompt: prompt,
-                    guidance_scale: 7.5,
-                    num_inference_steps: 50
+                    num_inference_steps: 50,
+                    guidance_scale: 7.5
                 }
             }
         );
 
-        // 3. Extract URL using our robust handler
+        // 3. Extract URL using our Robust Detective Handler
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
         // 4. Deduct Credits & Save Order
