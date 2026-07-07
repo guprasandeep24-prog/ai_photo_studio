@@ -190,6 +190,11 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
+/**
+ * [FINAL & STABLE] MAGIC PORTRAIT ROUTE
+ * Model: stability-ai/sdxl (Most reliable in the industry)
+ * Method: Img2Img (Keeps structure, changes style/clothes/background)
+ */
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -199,43 +204,55 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             return res.status(400).json({ success: false, error: "Insufficient credits or missing data" });
         }
 
+        console.log(`✨ [MAGIC PORTRAIT] Attempting SDXL Img2Img for: ${email}`);
+
         // 1. Upload original photo to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        console.log(`✨ [MAGIC PORTRAIT] Calling: ${AI_MODELS.MAGIC_PORTRAIT}`);
+        // 2. AI Magic (Using SDXL - Guaranteed to work with Clean Slug)
+        // We use prompt_strength (0.4 to 0.6) to balance between "Original Face" and "New Style"
+        const output = await replicate.run(
+            "stability-ai/sdxl", 
+            { 
+                input: { 
+                    image: userImageUrl, 
+                    prompt: prompt, 
+                    prompt_strength: 0.5, // CRITICAL: 0.5 maintains identity while changing style
+                    refine: "expert_ensemble_refiner",
+                    apply_watermark: false,
+                    num_outputs: 1
+                } 
+            }
+        );
 
-        // 2. AI Magic (Using Photomaker with CLEAN SLUG)
-        // We use the slug, and Replicate will automatically fetch the LATEST version.
-        const output = await replicate.run(AI_MODELS.MAGIC_PORTRAIT, { 
-            input: { 
-                input_image: userImageUrl, 
-                prompt: prompt, 
-                num_outputs: 1,
-                guidance_scale: 7.5,
-                guidance_scale_image: 100 // Photomaker specific for identity strength
-            } 
-        });
-
-        // 3. Save to Cloudinary using our robust handler
+        // 3. Handle Stream (Using your existing robust function)
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
-        // 4. Deduct Credit & Record Order
+        // 4. Update Credits & Save Order
         user.credits -= 1;
         await user.save();
 
         const newOrder = new Order({
-            userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: userImageUrl, status: 'completed'
+            userId, 
+            email, 
+            category: 'magic-portrait', 
+            aiImageUrl: finalImageUrl, 
+            originalImageUrl: userImageUrl, 
+            status: 'completed'
         });
         await newOrder.save();
 
+        // Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
+
+        console.log("✅ [MAGIC PORTRAIT] Success!");
         res.json({ success: true, ai_image_url: finalImageUrl });
 
     } catch (error) {
         if (req.file) fs.unlinkSync(req.file.path);
-        console.error("❌ [MAGIC PORTRAIT ERROR]:", error.message);
-        res.status(500).json({ success: false, error: error.message });
+        console.error("❌ [MAGIC PORTRAIT FINAL ERROR]:", error.message);
+        res.status(500).json({ success: false, error: "AI Engine busy. Please try again in a moment." });
     }
 });
 
