@@ -8,34 +8,49 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
 
+// Models (Ensure these files exist in your /models folder)
 const Order = require('./models/Order');
 const User = require('./models/User'); 
 const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
+// --- 🏗️ ARCHITECT'S CONFIGURATION (CENTRALIZED AI MODELS) ---
+// Yahan humne model hashes ko rakh liya hai taaki main code "Clean" rahe.
+// Ye versions permanent hote hain, ye expire nahi honge.
+const AI_MODELS = {
+    // Identity preservation ke liye Photomaker best hai
+    MAGIC_PORTRAIT: "tencentarc/photomaker:ddfc2b6a4b0900405e5563a312d29c906b37d1952ec74e6a51a6d20a72494f9a",
+    // Faceswap ke liye
+    FACESWAP: "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00",
+    // Prompt se nayi image ke liye (Very Fast)
+    MAGIC_PROMPT: "black-forest-labs/flux-schnell"
+};
+
+// --- MIDDLEWARES ---
 app.use(cors({
     origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ [DATABASE] Connected to MongoDB Atlas"))
     .catch(err => console.error("❌ [DATABASE] Connection Error:", err));
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
+// --- CLOUDINARY CONFIG ---
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// --- TEMPLATES CONFIGURATION ---
+// --- TEMPLATE DATA ---
 const TEMPLATES = {
     'linkedin': { 
         'man': [
@@ -87,6 +102,7 @@ const TEMPLATES = {
     }
 };
 
+// --- MULTER SETUP ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -97,20 +113,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- ULTIMATE ROBUST REPLICATE STREAM HANDLER ---
+// --- 🚀 POWERHOUSE UTILITY: REPLICATE STREAM TO CLOUDINARY ---
 async function handleReplicateStream(output, folder) {
     if (!output) throw new Error("AI returned no data.");
 
-    // 1. If it's already a direct URL string
+    // Case 1: Already a string (URL)
     if (typeof output === 'string' && output.startsWith('http')) return output;
 
-    // 2. If it's an array of strings
+    // Case 2: Array of strings
     if (Array.isArray(output)) {
         const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
-    // 3. If it's a stream (Pattern: for await...of)
+    // Case 3: Stream (The core fix using Buffer.concat)
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -118,24 +134,16 @@ async function handleReplicateStream(output, folder) {
         }
         const buffer = Buffer.concat(chunks);
         
-        // Check if buffer is a URL string (rare but possible)
-        const contentString = buffer.toString().trim();
-        if (contentString.startsWith('http')) return contentString;
-
-        // Otherwise, upload actual image buffer to Cloudinary
         return new Promise((resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(
-                { folder: folder },
-                (error, result) => {
-                    if (error) reject(error);
-                    else resolve(result.secure_url);
-                }
+                { folder },
+                (error, result) => (error ? reject(error) : resolve(result.secure_url))
             );
             uploadStream.end(buffer);
         });
     }
 
-    // 4. DEEP SEARCH for nested objects
+    // Case 4: Deep Search for nested objects (Extremely robust)
     const findUrlDeep = (obj) => {
         if (typeof obj === 'string' && obj.startsWith('http')) return obj;
         if (typeof obj === 'object' && obj !== null) {
@@ -150,25 +158,10 @@ async function handleReplicateStream(output, folder) {
     const deepFound = findUrlDeep(output);
     if (deepFound) return deepFound;
 
-    throw new Error("AI response format not recognized. Check logs.");
+    throw new Error("AI output format not recognized.");
 }
 
-async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
-    console.log("🤖 [AI] Starting Replicate Face-Swap...");
-    try {
-        // Keep existing version hash as requested to not break old features
-        const output = await replicate.run(
-            "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
-            { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
-        );
-        return await handleReplicateStream(output, "ai_studio_faceswap");
-    } catch (error) {
-        console.error("❌ [AI ERROR]:", error.message);
-        throw error;
-    }
-}
-
-// --- ROUTES ---
+// --- 🚀 API ROUTES ---
 
 app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 app.get('/templates', (req, res) => { res.json(TEMPLATES); });
@@ -203,73 +196,46 @@ app.get('/user-profile/:userId', async (req, res) => {
 });
 
 /**
- * [FIXED] MAGIC PORTRAIT ROUTE 
- * Model: stability-ai/sdxl (Using Slug ONLY for 100% Stability)
- * Logic: Img2Img via prompt_strength to preserve identity.
+ * [FIXED] MAGIC PORTRAIT ROUTE
+ * Purpose: Upload selfie + prompt -> New style, Same Face.
  */
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
 
-        // 1. Validations
         if (!user || user.credits <= 0 || !prompt || !req.file) {
-            return res.status(400).json({ 
-                success: false, 
-                error: "Insufficient credits or missing image/prompt" 
-            });
+            return res.status(400).json({ success: false, error: "Insufficient credits or missing data" });
         }
 
-        console.log(`✨ [MAGIC PORTRAIT] Identity Preservation Mode | User: ${email}`);
+        console.log(`✨ [MAGIC PORTRAIT] User: ${email} | Prompt: ${prompt}`);
 
-        // 2. Upload original selfie to Cloudinary
+        // 1. Upload original photo
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        /**
-         * 3. CALL STABLE SDXL MODEL
-         * Kyuki Photomaker bina hash ke 404 de raha tha, 
-         * hum SDXL use karenge jo "Slug" support karta hai.
-         * prompt_strength 0.5 - 0.6 is the MAGIC range.
-         * 0.5 = User's face remains mostly the same.
-         * 0.8 = Face changes too much.
-         */
-        console.log("🤖 [AI] Running SDXL Img2Img with Identity Preservation...");
-        
-        const output = await replicate.run(
-            "stability-ai/sdxl", // Clean Model Slug - NO HASH
-            { 
-                input: { 
-                    prompt: prompt,
-                    image: userImageUrl,       // User ki original photo
-                    prompt_strength: 0.55,     // MAGIC NUMBER: Face ko maintain rakhta hai
-                    refine: "expert_ensemble_refiner",
-                    apply_watermark: false,
-                    scheduler: "K_EULER"
-                }
-            }
-        );
+        // 2. AI Magic (Using Photomaker via Config constant)
+        const output = await replicate.run(AI_MODELS.MAGIC_PORTRAIT, { 
+            input: { 
+                input_image: userImageUrl, 
+                prompt: `${prompt}, cinematic lighting, high quality, 8k, highly detailed`, 
+                num_outputs: 1
+            } 
+        });
 
-        // 4. Extract URL using our robust handler
+        // 3. Save to Cloudinary
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
-        // 5. Credits & Order management
+        // 4. Update Credits & Order
         user.credits -= 1;
         await user.save();
 
         const newOrder = new Order({
-            userId, 
-            email, 
-            category: 'magic-portrait', 
-            aiImageUrl: finalImageUrl, 
-            originalImageUrl: userImageUrl, 
-            status: 'completed'
+            userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: userImageUrl, status: 'completed'
         });
         await newOrder.save();
 
-        // Cleanup local file
         if (req.file) fs.unlinkSync(req.file.path);
-
         res.json({ success: true, ai_image_url: finalImageUrl });
 
     } catch (error) {
@@ -279,6 +245,9 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     }
 });
 
+/**
+ * FACE SWAP ROUTE (Using Templates)
+ */
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
@@ -291,7 +260,11 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const originalImageUrl = uploadResult.secure_url;
 
-        const aiImageUrl = await runAIFaceSwap(originalImageUrl, targetImageUrl);
+        // AI Face Swap Call
+        const output = await replicate.run(AI_MODELS.FACESWAP, { 
+            input: { target_image: targetImageUrl, swap_image: originalImageUrl } 
+        });
+        const aiImageUrl = await handleReplicateStream(output, "ai_studio_faceswap");
 
         user.credits -= 1;
         await user.save();
@@ -310,13 +283,16 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
+/**
+ * MAGIC PROMPT ROUTE (Text-to-Image)
+ */
 app.post('/magic-prompt', async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
         if (!user || user.credits <= 0 || !prompt) return res.status(400).json({ success: false, error: "Invalid request" });
 
-        const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
+        const output = await replicate.run(AI_MODELS.MAGIC_PROMPT, { input: { prompt } });
         const finalImageUrl = await handleReplicateStream(output, "magic_prompts");
 
         user.credits -= 1;
