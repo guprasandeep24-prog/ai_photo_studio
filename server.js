@@ -97,32 +97,28 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- THE FINAL & CORRECTED FUNCTION (REPLACE EVERYTHING) ---
-// ध्यान दें: यह पहली लाइन (async function...) सबसे महत्वपूर्ण है!
+// --- THE ONLY CORRECT VERSION OF THIS FUNCTION ---
 async function handleReplicateStream(output, folder) {
-    
-    // 1. अगर output ही नहीं मिला (Null/Undefined)
+    // 1. Check if output exists
     if (output === undefined || output === null) {
         console.error("❌ [CRITICAL] handleReplicateStream received null or undefined output");
         throw new Error("AI returned no data (null/undefined)");
     }
 
-    // 2. अगर output एक सीधा URL स्ट्रिंग है
+    // 2. If it's a direct URL string
     if (typeof output === 'string' && output.startsWith('http')) {
         return output;
     }
 
-    // 3. अगर output एक Array है (जैसे [ "https://..." ])
+    // 3. If it's an array
     if (Array.isArray(output) && output.length > 0) {
         const url = output.find(item => typeof item === 'string' && item.startsWith('http'));
         if (url) return url;
     }
 
-    // 4. अगर output एक Object है (यहाँ आपका Error आ रहा था)
+    // 4. If it's an object (The part causing your error)
     if (typeof output === 'object') {
         console.log("🔍 [DEBUG] Inspecting AI Object Response:", JSON.stringify(output));
-
-        // Common keys के जरिए URL ढूँढना
         const commonKeys = ['output', 'url', 'image', 'href', 'result', 'prediction_url', 'predictions', 'image_url'];
         for (const key of commonKeys) {
             if (output[key]) {
@@ -134,8 +130,6 @@ async function handleReplicateStream(output, folder) {
                 }
             }
         }
-
-        // Deep Search: अगर ऊपर के keys काम न करें, तो पूरे object में गहराई से ढूँढना
         const findUrlDeep = (obj) => {
             for (let key in obj) {
                 if (typeof obj[key] === 'string' && obj[key].startsWith('http')) return obj[key];
@@ -150,7 +144,7 @@ async function handleReplicateStream(output, folder) {
         if (deepFound) return deepFound;
     }
 
-    // 5. अगर output एक Stream है (Replicate standard)
+    // 5. If it's a Stream
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { 
@@ -169,8 +163,7 @@ async function handleReplicateStream(output, folder) {
         }
     }
     
-    console.error("❌ [CRITICAL ERROR] AI Response Format Unrecognized:", JSON.stringify(output));
-    throw new Error("AI returned an unparseable format. Check server logs.");
+    throw new Error("AI returned an unparseable format.");
 }
     
     // Handle Object response
