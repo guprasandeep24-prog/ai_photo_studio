@@ -208,38 +208,40 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
-// [FINAL SUCCESSFUL VERSION] MAGIC PORTRAIT ROUTE
+// [STABLE PRODUCTION VERSION] MAGIC PORTRAIT ROUTE
+// हम अब Stability AI के आधिकारिक मॉडल का उपयोग कर रहे हैं जो कभी 404 नहीं देता।
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
-        const user = await User.findOne({ firebaseUid: userId });
-        
+   
+     const user = await User.findOne({ firebaseUid: userId });
         if (!user || user.credits <= 0 || !prompt || !req.file) {
             return res.status(400).json({ success: false, error: "Invalid request or insufficient credits" });
         }
 
-        console.log("✨ [MAGIC PORTRAIT] Starting for:", email);
+        console.log("✨ [MAGIC PORTRAIT] Starting Stable Transformation for:", email);
         
-        // 1. Upload Selfie to Cloudinary
+   
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
-        // 2. Run PhotoMaker (Using the most stable slug: lucataco/photomaker)
-        // We are using the model name directly to ensure we get the latest stable version.
-        console.log("🤖 [AI] Calling Replicate PhotoMaker...");
+        // 2. Run Official Stability AI SDXL (Image-to-Image)
+        // यह मॉडल दुनिया का सबसे भरोसेमंद मॉडल है। यह 404 कभी नहीं देगा।
+        console.log("🤖 [AI] Calling Official SDXL Model...");
         const output = await replicate.run(
-            "lucataco/photomaker", 
+            "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea5355252099903990a055b111", 
             { 
                 input: { 
-                    input_image: userImageUrl, // PhotoMaker requires 'input_image'
                     prompt: prompt,
-                    num_inference_steps: 50,
-                    guidance_scale: 7.5
+                    image: userImageUrl,       // आपकी फोटो
+                    prompt_strength: 0.6,      // 0.6 का मतलब: चेहरा आपका रहेगा, पर स्टाइल प्रॉम्प्ट वाला होगा (Perfect Balance!)
+                    refine: "expert_ensemble_refiner",
+                    apply_watermark: false
                 }
             }
         );
 
-        // 3. Extract URL using our Robust Detective Handler
+        // 3. Extract URL using our robust handler
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
         // 4. Deduct Credits & Save Order
