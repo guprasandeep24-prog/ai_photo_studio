@@ -8,16 +8,14 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
 
-// Models
 const Order = require('./models/Order');
 const User = require('./models/User'); 
 const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
-// --- 🏗️ ARCHITECT'S CONFIGURATION ---
-// YOU KEEP ONLY CLEAN SLUGS HERE. No hashes. 
-// This makes your code clean and easy to read.
+// --- 🏗️ CONFIGURATION ---
+// Clean Slugs - As per your instruction
 const AI_MODELS = {
     MAGIC_PORTRAIT: "tencentarc/photomaker", 
     FACESWAP: "lucataco/faceswap", 
@@ -26,31 +24,28 @@ const AI_MODELS = {
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
-// --- 🛠️ THE SMART-RUNNER ENGINE (The Secret Sauce) ---
-/**
- * This function takes a CLEAN SLUG (like 'tencentarc/photomaker'),
- * automatically finds the LATEST valid version from Replicate,
- * and then runs it. This prevents both 404 and 422 errors.
- */
+// --- 🛠️ THE FIXED SMART-RUNNER (The REAL Fix) ---
 async function runSmartAI(modelSlug, input) {
-    console.log(`🔍 [SMART-RUNNER] Resolving latest version for: ${modelSlug}`);
+    console.log(`🔍 [SMART-RUNNER] Fetching metadata for: ${modelSlug}`);
     
-    // 1. Fetch the model details using the clean slug
+    // 1. Get model metadata
     const model = await replicate.models.get(modelSlug);
     
-    if (!model || !model.versions || model.versions.length === 0) {
-        throw new Error(`Model ${modelSlug} not found or has no versions.`);
+    if (!model || !model.version_ids || model.version_ids.length === 0) {
+        throw new Error(`Could not find versions for ${modelSlug}.`);
     }
 
-    // 2. Get the most recent version ID (This is the magic part)
-    const latestVersionId = model.versions[0].id;
-    console.log(`✅ [SMART-RUNNER] Found latest version: ${latestVersionId}`);
+    // 2. CORRECT PROPERTY: 'version_ids' is an array of strings in Replicate SDK
+    // We take the very first (latest) ID from that array.
+    const latestVersionId = model.version_ids[0]; 
+    
+    console.log(`✅ [SMART-RUNNER] Successfully resolved ${modelSlug} to version: ${latestVersionId}`);
 
-    // 3. Run the prediction with the dynamic ID
+    // 3. Run using the ID
     return await replicate.run(latestVersionId, { input });
 }
 
-// --- MIDDLEWARES & CONFIG ---
+// --- MIDDLEWARES ---
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -75,11 +70,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Robust Stream Handler
 async function handleReplicateStream(output, folder) {
     if (typeof output === 'string' && output.startsWith('http')) return output;
     if (Array.isArray(output)) return output[0];
-
     if (output && typeof output[Symbol.asyncIterator] === 'function') {
         const chunks = [];
         for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
@@ -89,8 +82,6 @@ async function handleReplicateStream(output, folder) {
             stream.end(buffer);
         });
     }
-    
-    // Deep Search fallback
     const findUrl = (obj) => {
         if (typeof obj === 'string' && obj.startsWith('http')) return obj;
         if (obj && typeof obj === 'object') {
@@ -113,7 +104,7 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
 
         const uploadRes = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         
-        // Use the Smart Runner! It will find the ID for "tencentarc/photomaker" automatically
+        // RUNNING MAGIC PORTRAIT
         const output = await runSmartAI(AI_MODELS.MAGIC_PORTRAIT, { 
             input_image: uploadRes.secure_url, 
             prompt: prompt,
@@ -124,7 +115,6 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
 
         user.credits -= 1;
         await user.save();
-
         await new Order({ userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: uploadRes.secure_url, status: 'completed' }).save();
 
         if (req.file) fs.unlinkSync(req.file.path);
@@ -150,7 +140,6 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         user.credits -= 1;
         await user.save();
-
         await new Order({ userId, email, category, gender, aiImageUrl, originalImageUrl: uploadRes.secure_url, status: 'completed' }).save();
 
         if (req.file) fs.unlinkSync(req.file.path);
