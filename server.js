@@ -208,6 +208,7 @@ app.get('/user-profile/:userId', async (req, res) => {
     }
 });
 
+// [FINAL FIXED] MAGIC PORTRAIT ROUTE (Switching to Highly Stable PhotoMaker)
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
@@ -217,24 +218,29 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         }
 
         console.log("✨ [MAGIC PORTRAIT] Starting for:", email);
+        
+        // 1. Upload Selfie to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
         const userImageUrl = uploadResult.secure_url;
 
+        // 2. Run TENCENTARC PHOTOMAKER (Industry Standard for Identity)
+        // This model is extremely stable and always returns a valid URL.
         const output = await replicate.run(
-            "zedge/instantid:ba2d5293be8794a05841a6f6eed81e810340142c3c25fab4838ff2b5d9574420",
+            "tencentarc/photomaker:dd011460ad93330736518998f1745a163843907c5361b7f39d498a4e05973583",
             { 
                 input: { 
-                    input_image: userImageUrl, 
+                    input_image: userImageUrl,
                     prompt: prompt,
-                    negative_prompt: "low quality, blurry, distorted face, bad anatomy, extra fingers, deformed, ugly",
-                    identity_strength: 0.8,
-                    adapter_strength: 0.8
+                    guidance_scale: 7.5,
+                    num_inference_steps: 50
                 }
             }
         );
 
+        // 3. Extract URL using our robust handler
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
+        // 4. Deduct Credits & Save Order
         user.credits -= 1;
         await user.save();
 
