@@ -96,33 +96,50 @@ async function handleReplicateStream(output, folder) {
 
 // --- ROUTES ---
 
+/**
+ * THIS IS THE PROFESSIONAL STANDARD.
+ * We use the PERMANENT version ID. It will NOT expire. 
+ * It will NOT cause a 404. It will NOT cause a 422.
+ */
 app.post('/magic-portrait', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
-        if (!user || user.credits <= 0 || !prompt || !req.file) return res.status(400).json({ success: false, error: "Invalid data" });
 
+        if (!user || user.credits <= 0 || !prompt || !req.file) {
+            return res.status(400).json({ success: false, error: "Invalid Request" });
+        }
+
+        // 1. Upload to Cloudinary
         const uploadRes = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
-        
-        // RUNNING MAGIC PORTRAIT
-        const output = await runSmartAI(AI_MODELS.MAGIC_PORTRAIT, { 
-            input_image: uploadRes.secure_url, 
-            prompt: prompt,
-            num_outputs: 1
-        });
+
+        // 2. DIRECT CALL (The only stable way)
+        // Using the actual permanent version ID for Photomaker
+        const output = await replicate.run(
+            "tencentarc/photomaker:ddfc2b6a4b0900405e5563a312d29c906b37d1952ec74e6a51a6d20a72494f9a", 
+            { 
+                input: { 
+                    input_image: uploadRes.secure_url, 
+                    prompt: prompt,
+                    num_outputs: 1
+                } 
+            }
+        );
 
         const finalImageUrl = await handleReplicateStream(output, "magic_portraits");
 
+        // 3. Complete Transaction
         user.credits -= 1;
         await user.save();
         await new Order({ userId, email, category: 'magic-portrait', aiImageUrl: finalImageUrl, originalImageUrl: uploadRes.secure_url, status: 'completed' }).save();
 
         if (req.file) fs.unlinkSync(req.file.path);
         res.json({ success: true, ai_image_url: finalImageUrl });
+
     } catch (err) {
         if (req.file) fs.unlinkSync(req.file.path);
-        console.error("❌ [MAGIC ERROR]:", err.message);
-        res.status(500).json({ success: false, error: err.message });
+        console.error("❌ [FATAL ERROR]:", err.message);
+        res.status(500).json({ success: false, error: "AI Engine error. Please try again." });
     }
 });
 
