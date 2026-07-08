@@ -318,12 +318,7 @@
         </div>
     </div>
 
-    <!-- ... (Top Part stays exactly the same as your code) ... -->
-<!-- ... (Include all your existing HTML structure, CSS, and Head here) ... -->
-
-<!-- Paste your existing HTML here, I'll provide only the updated Script part to save space. 
-     IMPORTANT: Keep all your HTML/CSS as it is. I am updating the logic inside <script type="module">. 
--->
+    
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -580,9 +575,7 @@
         }
     });
 
-    // --- REST OF YOUR EXISTING FUNCTIONS (Logout, Templates, Auth, Payment, Timer) ---
-    // (Keep all your remaining existing code here like onAuthStateChanged, selectTemplate, etc.)
-    // I am not repeating it to save space, just ensure they remain exactly as in your original.
+    
 
     window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
@@ -816,6 +809,6 @@
         startTimer(86400); 
     });
 </script>
-<!-- ... (End of File) ... -->
+
 </body>
 </html>
