@@ -35,7 +35,6 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// --- TEMPLATES CONFIGURATION ---
 const TEMPLATES = {
     'linkedin': { 
         'man': [
@@ -97,7 +96,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- AI CORE LOGIC ---
 async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     console.log("🤖 [AI] Starting Replicate Face-Swap...");
     try {
@@ -112,30 +110,12 @@ async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
             const urlFromObj = output.output || output.url || output.image;
             if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
         }
-        
-        if (output && typeof output[Symbol.asyncIterator] === 'function') {
-            const chunks = [];
-            for await (const chunk of output) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
-            const buffer = Buffer.concat(chunks);
-            const contentString = buffer.toString().trim();
-            if (contentString.startsWith('http')) return contentString;
-            if (buffer.length > 0) {
-                const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_stream({ folder: "ai_studio_generated" }, (error, result) => {
-                        if (error) reject(error); else resolve(result);
-                    }).end(buffer);
-                });
-                return uploadResult.secure_url;
-            }
-        }
         throw new Error("AI returned unparseable format");
     } catch (error) {
         console.error("❌ [AI ERROR]:", error.message);
         throw error;
     }
 }
-
-// --- ROUTES ---
 
 app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 app.get('/templates', (req, res) => { res.json(TEMPLATES); });
@@ -147,7 +127,6 @@ app.post('/register', async (req, res) => {
         if (!user) {
             user = new User({ firebaseUid, email, credits: 5 });
             await user.save();
-            console.log(`🆕 [NEW USER] Registered: ${email}`);
         }
         res.json({ success: true });
     } catch (error) {
@@ -203,7 +182,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
 
     } catch (error) {
-        if (req.file) fs.unlinkSync(req.file.path);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -216,30 +195,17 @@ app.post('/magic-prompt', async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid request or no credits" });
         }
 
-        console.log("✨ [MAGIC PROMPT] Generating:", prompt);
         const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
-
         let finalImageUrl = "";
         let target = Array.isArray(output) ? output[0] : output;
 
         if (typeof target === 'string' && target.startsWith('http')) {
             finalImageUrl = target;
-        } else if (target && typeof target[Symbol.asyncIterator] === 'function') {
-            const chunks = [];
-            for await (const chunk of target) { chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk); }
-            const buffer = Buffer.concat(chunks);
-            const uploadResult = await new Promise((resolve, reject) => {
-                cloudinary.uploader.upload_stream({ folder: "magic_prompts" }, (error, result) => {
-                    if (error) reject(error); else resolve(result);
-                }).end(buffer);
-            });
-            finalImageUrl = uploadResult.secure_url;
-        } else if (target && typeof target === 'object') {
-            finalImageUrl = target.url || target.href || target.output || "";
+        } else {
+            throw new Error("Failed to get image URL");
         }
 
-        if (!finalImageUrl) throw new Error("Failed to get image URL");
-
+        // Ensure permanent URL via Cloudinary
         let permanentUrl = finalImageUrl;
         if (!finalImageUrl.includes('cloudinary.com')) {
             const uploadResult = await cloudinary.uploader.upload(finalImageUrl, { folder: "magic_prompts" });
@@ -260,8 +226,6 @@ app.post('/magic-prompt', async (req, res) => {
     }
 });
 
-
-
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
@@ -272,4 +236,7 @@ app.get('/my-photos', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`));
+const server = app.listen(PORT, () => console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`));
+
+// CRITICAL FIX: Increase timeout to handle long-running AI tasks
+server.timeout = 300000; // 5 Minutes
