@@ -226,6 +226,109 @@ app.post('/magic-prompt', async (req, res) => {
     }
 });
 
+// ✅ NEW: 4K UPSCALE ROUTE (FIX - ye route pehle missing tha!)
+app.post('/upscale', async (req, res) => {
+    try {
+        const { userId, email, imageUrl } = req.body;
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!imageUrl) return res.status(400).json({ success: false, error: "No image URL provided" });
+
+        console.log("✨ [UPSCALE] Starting 4K Enhancement...");
+
+        // Real-ESRGAN model for 4x upscaling with face enhancement
+        const output = await replicate.run(
+            "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b",
+            { input: { image: imageUrl, scale: 4, face_enhance: true } }
+        );
+
+        let upscaledUrl = typeof output === 'string' ? output
+            : Array.isArray(output) ? output[0]
+            : (output && output.url ? output.url : null);
+
+        if (!upscaledUrl) throw new Error("Upscaling returned no result");
+
+        // Save permanently to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "upscaled_images" });
+        const permanentUrl = uploadResult.secure_url;
+
+        user.credits -= 1;
+        await user.save();
+
+        const newOrder = new Order({
+            userId, email: email || "unknown@user.com",
+            category: 'upscale', aiImageUrl: permanentUrl,
+            originalImageUrl: imageUrl, status: 'completed'
+        });
+        await newOrder.save();
+
+        console.log("✅ [UPSCALE] Done:", permanentUrl);
+        res.json({ success: true, ai_image_url: permanentUrl });
+
+    } catch (error) {
+        console.error("❌ [UPSCALE ERROR]:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ✅ NEW: MAGIC PORTRAIT ROUTE (FIX - ye route pehle missing tha!)
+// Flow: User photo upload → Generate AI scene from prompt → Face swap into scene
+app.post('/magic-portrait', upload.single('image'), async (req, res) => {
+    try {
+        const { userId, email, prompt } = req.body;
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
+        if (!prompt) return res.status(400).json({ success: false, error: "Prompt is required" });
+
+        console.log("🎭 [MAGIC PORTRAIT] Starting transformation for:", userId);
+
+        // Step 1: Upload user's selfie to Cloudinary
+        const userUpload = await cloudinary.uploader.upload(req.file.path, { folder: "portrait_inputs" });
+        const userImageUrl = userUpload.secure_url;
+        console.log("📸 [MAGIC PORTRAIT] User photo uploaded:", userImageUrl);
+
+        // Step 2: Generate a scene/background using flux-schnell from the prompt
+        const sceneOutput = await replicate.run("black-forest-labs/flux-schnell", { 
+            input: { prompt: prompt, num_outputs: 1, num_inference_steps: 4 }
+        });
+        let sceneUrl = Array.isArray(sceneOutput) ? sceneOutput[0] : sceneOutput;
+        if (typeof sceneUrl !== 'string' || !sceneUrl.startsWith('http')) {
+            throw new Error("Scene generation from prompt failed");
+        }
+        console.log("🎨 [MAGIC PORTRAIT] Scene generated:", sceneUrl);
+
+        // Step 3: Face swap user's face into the generated scene
+        const faceSwappedUrl = await runAIFaceSwap(userImageUrl, sceneUrl);
+        console.log("🔄 [MAGIC PORTRAIT] Face swap done:", faceSwappedUrl);
+
+        // Step 4: Save result permanently in Cloudinary
+        const finalUpload = await cloudinary.uploader.upload(faceSwappedUrl, { folder: "magic_portraits" });
+        const permanentUrl = finalUpload.secure_url;
+
+        user.credits -= 1;
+        await user.save();
+
+        const newOrder = new Order({
+            userId, email: email || "unknown@user.com",
+            category: 'magic-portrait', gender: 'any',
+            aiImageUrl: permanentUrl, originalImageUrl: userImageUrl, status: 'completed'
+        });
+        await newOrder.save();
+
+        if (req.file) fs.unlinkSync(req.file.path);
+        console.log("✅ [MAGIC PORTRAIT] Complete:", permanentUrl);
+        res.json({ success: true, ai_image_url: permanentUrl, original_image_url: userImageUrl });
+
+    } catch (error) {
+        console.error("❌ [MAGIC PORTRAIT ERROR]:", error.message);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });
@@ -237,6 +340,5 @@ app.get('/my-photos', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => console.log(`✅ [SYSTEM] SERVER RUNNING ON PORT ${PORT}`));
-
 
 server.timeout = 300000; // 5 Minutes

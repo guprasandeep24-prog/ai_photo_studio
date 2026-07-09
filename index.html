@@ -190,7 +190,7 @@
                             <p class="mt-2 text-sm text-gray-400">Click to Upload Photo</p>
                         </div>
                         <img id="portrait-image-preview" class="hidden w-full h-full object-cover" src="" alt="Preview">
-                        <button id="remove-portrait-btn" class="hidden absolute top-2 right-2 bg-red-500/80 text-white p-2 rounded-full transition-all">
+                        <button id="remove-portrait-btn" class="hidden absolute top-2 right-2 bg-red-500/80 text-white p-2 rounded-full transition-all z-10">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -258,7 +258,7 @@
                         <h4 class="text-lg font-bold">Pro Pack</h4>
                         <div class="text-3xl font-extrabold text-indigo-600 my-2">₹999</div>
                         <p class="text-slate-500 text-sm mb-6">120 AI Credits</p>
-                        <button class="w-full bg-indigo-600 text-white py-2 rounded-xl fontbold transition">Buy Now</button>
+                        <button class="w-full bg-indigo-600 text-white py-2 rounded-xl font-bold transition">Buy Now</button>
                     </div>
                 </div>
             </div>
@@ -269,9 +269,11 @@
         <div class="bg-white p-10 rounded-3xl text-center text-slate-900">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
             <h2 class="text-xl font-bold">AI is Working...</h2>
+            <p class="text-slate-500 text-sm mt-2">Please wait, this may take 30-60 seconds</p>
         </div>
     </div>
 
+    <!-- ✅ FIX: Success Modal with enhanceBtn added -->
     <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
@@ -295,6 +297,10 @@
                 <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
                     <i class="fa-solid fa-download mr-2"></i> Download
                 </a>
+                <!-- ✅ FIX: enhanceBtn ab yahan hai - pehle missing tha! -->
+                <button id="enhanceBtn" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Enhance to 4K ✨
+                </button>
                 <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
                     Try another way
                 </button>
@@ -318,8 +324,6 @@
         </div>
     </div>
 
-    
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -339,7 +343,7 @@
     const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
     // Global helper for fetch with automatic timeout
-    async function fetchWithTimeout(url, options, timeoutMs = 120000) { // Default 2 min
+    async function fetchWithTimeout(url, options, timeoutMs = 120000) {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeoutMs);
         try {
@@ -359,6 +363,7 @@
     window.isLoginMode = true;
     window.selectedTemplateIndex = null;
     window.allTemplates = {};
+    window.portraitFile = null; // ✅ NEW: Magic Portrait ke liye
 
     window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
     window.togglePricingModal = () => document.getElementById('pricingModal').classList.toggle('hidden');
@@ -391,7 +396,7 @@
         } catch (error) { alert("Auth Error: " + error.message); }
     });
 
-    // --- ENHANCE/UPSCALE LOGIC (UPDATED) ---
+    // --- ENHANCE/UPSCALE LOGIC ---
     window.handleUpscale = async function() {
         const user = auth.currentUser;
         const currentImageUrl = document.getElementById('resultImage').src;
@@ -410,7 +415,7 @@
                     email: user.email,
                     imageUrl: currentImageUrl
                 })
-            });
+            }, 180000); // 3 min timeout for upscaling
             const result = await response.json();
 
             if (result.success) {
@@ -424,7 +429,7 @@
             const msg = error.name === 'AbortError' ? "Request timed out. AI is taking too long." : error.message;
             alert("❌ Error: " + msg);
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden'); // ALWAYS HIDES SPINNER
+            document.getElementById('loadingModal').classList.add('hidden');
         }
     };
 
@@ -443,7 +448,7 @@
                     email: user.email,
                     imageUrl: imageUrl
                 })
-            });
+            }, 180000);
             const result = await response.json();
 
             if (result.success) {
@@ -458,13 +463,14 @@
             const msg = error.name === 'AbortError' ? "Timeout: Try again." : error.message;
             alert("❌ Error: " + msg);
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden'); // ALWAYS HIDES SPINNER
+            document.getElementById('loadingModal').classList.add('hidden');
         }
     };
 
+    // ✅ FIX: enhanceBtn ab HTML mein hai, to ye handler kaam karega
     document.getElementById('enhanceBtn').onclick = window.handleUpscale;
 
-    // --- MAGIC PROMPT (UPDATED) ---
+    // --- MAGIC PROMPT ---
     window.openMagicPrompt = () => document.getElementById('magicPromptModal').classList.remove('hidden');
     window.closeMagicPrompt = () => {
         document.getElementById('magicPromptModal').classList.add('hidden');
@@ -512,11 +518,127 @@
             const msg = error.name === 'AbortError' ? "AI is taking too long. Try a shorter prompt." : error.message;
             alert("❌ Error: " + msg);
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden'); // ALWAYS HIDES SPINNER
+            document.getElementById('loadingModal').classList.add('hidden');
         }
     });
 
-    // --- FACE SWAP SUBMIT (UPDATED) ---
+    // ✅ NEW: MAGIC PORTRAIT - Open/Close functions (pehle ye define hi nahi thi!)
+    window.openMagicPortrait = () => {
+        document.getElementById('magicPortraitModal').classList.remove('hidden');
+    };
+
+    window.closeMagicPortrait = () => {
+        document.getElementById('magicPortraitModal').classList.add('hidden');
+        document.getElementById('portrait-prompt-input').value = '';
+        // Reset file preview
+        window.portraitFile = null;
+        document.getElementById('portrait-file-input').value = '';
+        document.getElementById('portrait-image-preview').classList.add('hidden');
+        document.getElementById('portrait-image-preview').src = '';
+        document.getElementById('upload-placeholder').classList.remove('hidden');
+        document.getElementById('remove-portrait-btn').classList.add('hidden');
+        // Reset button state
+        document.getElementById('portrait-btn-text').classList.remove('hidden');
+        document.getElementById('portrait-btn-spinner').classList.add('hidden');
+    };
+
+    // ✅ NEW: Portrait file upload preview handler (pehle ye missing tha!)
+    const portraitUploadWrapper = document.getElementById('portrait-upload-wrapper');
+    const portraitFileInput = document.getElementById('portrait-file-input');
+    const portraitImagePreview = document.getElementById('portrait-image-preview');
+    const uploadPlaceholder = document.getElementById('upload-placeholder');
+    const removePortraitBtn = document.getElementById('remove-portrait-btn');
+
+    // Click on wrapper → open file picker (but not if clicking remove button)
+    portraitUploadWrapper.addEventListener('click', (e) => {
+        if (e.target !== removePortraitBtn && !removePortraitBtn.contains(e.target)) {
+            portraitFileInput.click();
+        }
+    });
+
+    // File selected → show preview
+    portraitFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            window.portraitFile = file;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                portraitImagePreview.src = event.target.result;
+                portraitImagePreview.classList.remove('hidden');
+                uploadPlaceholder.classList.add('hidden');
+                removePortraitBtn.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Remove button → clear preview
+    removePortraitBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.portraitFile = null;
+        portraitFileInput.value = '';
+        portraitImagePreview.classList.add('hidden');
+        portraitImagePreview.src = '';
+        uploadPlaceholder.classList.remove('hidden');
+        removePortraitBtn.classList.add('hidden');
+    });
+
+    // ✅ NEW: Magic Portrait SUBMIT handler (pehle ye completely missing tha!)
+    document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
+        const user = auth.currentUser;
+        const prompt = document.getElementById('portrait-prompt-input').value.trim();
+
+        if (!user) return alert("Please Login first!");
+        if (!window.portraitFile) return alert("Please upload your photo first!");
+        if (!prompt) return alert("Please describe your new look!");
+
+        // Show loading state on button
+        document.getElementById('portrait-btn-text').classList.add('hidden');
+        document.getElementById('portrait-btn-spinner').classList.remove('hidden');
+        document.getElementById('loadingModal').classList.remove('hidden');
+
+        try {
+            const formData = new FormData();
+            formData.append('userId', user.uid);
+            formData.append('email', user.email);
+            formData.append('prompt', prompt);
+            formData.append('image', window.portraitFile);
+
+            // 3 minute timeout for magic portrait (3 AI steps run)
+            const response = await fetchWithTimeout(`${BASE_URL}/magic-portrait`, {
+                method: 'POST',
+                body: formData
+            }, 180000);
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Show result in success modal
+                document.getElementById('resultImage').src = result.ai_image_url;
+                document.getElementById('downloadBtn').href = result.ai_image_url;
+                document.getElementById('successTitle').innerText = "Portrait Ready! 🎭";
+                document.getElementById('successSubtitle').innerText = "Your magical portrait is ready.";
+                // Hide comparison slider (no before/after for portrait)
+                document.getElementById('beforeImageWrapper').style.display = 'none';
+                document.getElementById('sliderHandle').style.display = 'none';
+                document.getElementById('comparisonSlider').style.display = 'none';
+
+                closeMagicPortrait();
+                document.getElementById('successModal').classList.remove('hidden');
+            } else {
+                throw new Error(result.error || "Portrait generation failed");
+            }
+        } catch (error) {
+            const msg = error.name === 'AbortError' ? "AI is taking too long. Please try again." : error.message;
+            alert("❌ Error: " + msg);
+        } finally {
+            document.getElementById('portrait-btn-text').classList.remove('hidden');
+            document.getElementById('portrait-btn-spinner').classList.add('hidden');
+            document.getElementById('loadingModal').classList.add('hidden');
+        }
+    });
+
+    // --- FACE SWAP SUBMIT ---
     document.getElementById('submitBtn').addEventListener('click', async function() {
         const user = auth.currentUser;
         if (!user) return alert("Please Login first!");
@@ -571,11 +693,9 @@
             const msg = error.name === 'AbortError' ? "Connection timed out. The AI task is too heavy." : error.message;
             alert("❌ Error: " + msg);
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden'); // ALWAYS HIDES SPINNER
+            document.getElementById('loadingModal').classList.add('hidden');
         }
     });
-
-    
 
     window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
@@ -731,7 +851,7 @@
         }
     });
 
-    // Razorpay logic (Unchanged)
+    // Razorpay logic
     window.startPayment = async (amount, credits) => {
         const user = auth.currentUser;
         if (!user) return alert("Please login first!");
@@ -808,6 +928,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         startTimer(86400); 
     });
+    startTimer(86400);
 </script>
 
 </body>
