@@ -117,6 +117,51 @@ async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
     }
 }
 
+// ✅ FIX 1: Replicate SDK nayi versions mein FileOutput object return karta hai, string nahi
+// Ye helper dono formats handle karta hai (purani + nayi SDK)
+function parseReplicateUrl(output) {
+    let target = Array.isArray(output) ? output[0] : output;
+    if (!target) return null;
+
+    // Old SDK: direct string URL
+    if (typeof target === 'string' && target.startsWith('http')) return target;
+
+    // New SDK: FileOutput object with .url() method
+    if (typeof target.url === 'function') {
+        try { return target.url().toString(); } catch(e) {}
+    }
+
+    // New SDK: FileOutput with .toString() method
+    if (typeof target.toString === 'function') {
+        const str = target.toString();
+        if (str.startsWith('http')) return str;
+    }
+
+    // Object with url property
+    if (target.url && typeof target.url === 'string' && target.url.startsWith('http')) {
+        return target.url;
+    }
+
+    return null;
+}
+
+// ✅ FIX 2: GPU Memory error fix - Cloudinary URL mein resize transformation add karo
+// Max GPU pixels = 2,096,704 → sqrt ≈ 1448 → 1400 safe limit
+async function getResizedImageUrl(imageUrl, maxDim = 1400) {
+    if (imageUrl && imageUrl.includes('res.cloudinary.com')) {
+        // Cloudinary URL → inline transformation add karo (no extra API call needed!)
+        return imageUrl.replace('/upload/', `/upload/w_${maxDim},h_${maxDim},c_fit/`);
+    } else {
+        // Non-Cloudinary URL → pehle Cloudinary mein upload karo resize ke saath
+        console.log("⚙️ [RESIZE] Non-Cloudinary URL, uploading with resize...");
+        const result = await cloudinary.uploader.upload(imageUrl, {
+            folder: "resized_inputs",
+            transformation: [{ width: maxDim, height: maxDim, crop: 'fit' }]
+        });
+        return result.secure_url;
+    }
+}
+
 app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 app.get('/templates', (req, res) => { res.json(TEMPLATES); });
 
@@ -196,14 +241,10 @@ app.post('/magic-prompt', async (req, res) => {
         }
 
         const output = await replicate.run("black-forest-labs/flux-schnell", { input: { prompt } });
-        let finalImageUrl = "";
-        let target = Array.isArray(output) ? output[0] : output;
 
-        if (typeof target === 'string' && target.startsWith('http')) {
-            finalImageUrl = target;
-        } else {
-            throw new Error("Failed to get image URL");
-        }
+        // ✅ FIX: parseReplicateUrl use karo (old + new SDK dono handle hote hain)
+        const finalImageUrl = parseReplicateUrl(output);
+        if (!finalImageUrl) throw new Error("Failed to get image URL from Replicate");
 
         // Ensure permanent URL via Cloudinary
         let permanentUrl = finalImageUrl;
@@ -237,16 +278,21 @@ app.post('/upscale', async (req, res) => {
 
         console.log("✨ [UPSCALE] Starting 4K Enhancement...");
 
+        // ✅ FIX: GPU memory error - image ko pehle resize karo (max 1400x1400)
+        // Real-ESRGAN GPU limit: ~2,096,704 pixels. 5472x3648 = 19.9M pixels → ERROR!
+        // Solution: 1400x1400 = 1.96M pixels → GPU limit ke andar rahega
+        console.log("⚙️ [UPSCALE] Resizing image for GPU compatibility...");
+        const resizedImageUrl = await getResizedImageUrl(imageUrl, 1400);
+        console.log("✅ [UPSCALE] Resized URL ready:", resizedImageUrl);
+
         // Real-ESRGAN model for 4x upscaling with face enhancement
         const output = await replicate.run(
             "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b",
-            { input: { image: imageUrl, scale: 4, face_enhance: true } }
+            { input: { image: resizedImageUrl, scale: 4, face_enhance: true } }
         );
 
-        let upscaledUrl = typeof output === 'string' ? output
-            : Array.isArray(output) ? output[0]
-            : (output && output.url ? output.url : null);
-
+        // ✅ FIX: parseReplicateUrl use karo (new SDK FileOutput bhi handle hota hai)
+        const upscaledUrl = parseReplicateUrl(output);
         if (!upscaledUrl) throw new Error("Upscaling returned no result");
 
         // Save permanently to Cloudinary
@@ -294,10 +340,11 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         const sceneOutput = await replicate.run("black-forest-labs/flux-schnell", { 
             input: { prompt: prompt, num_outputs: 1, num_inference_steps: 4 }
         });
-        let sceneUrl = Array.isArray(sceneOutput) ? sceneOutput[0] : sceneOutput;
-        if (typeof sceneUrl !== 'string' || !sceneUrl.startsWith('http')) {
-            throw new Error("Scene generation from prompt failed");
-        }
+
+        // ✅ FIX: parseReplicateUrl use karo - ye pehle fail ho raha tha kyunki
+        // nayi Replicate SDK FileOutput object return karti hai, raw string nahi
+        const sceneUrl = parseReplicateUrl(sceneOutput);
+        if (!sceneUrl) throw new Error("Scene generation from prompt failed");
         console.log("🎨 [MAGIC PORTRAIT] Scene generated:", sceneUrl);
 
         // Step 3: Face swap user's face into the generated scene
