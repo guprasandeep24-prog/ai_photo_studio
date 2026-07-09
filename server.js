@@ -295,9 +295,16 @@ app.post('/upscale', async (req, res) => {
         const upscaledUrl = parseReplicateUrl(output);
         if (!upscaledUrl) throw new Error("Upscaling returned no result");
 
-        // Save permanently to Cloudinary
-        const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { folder: "upscaled_images" });
+        // ✅ FIX: Cloudinary free plan limit 10MB hai, upscaled image 29MB tak ho sakti hai
+        // Solution: JPG format + quality compression se file size 3-5MB tak aa jaati hai
+        console.log("💾 [UPSCALE] Uploading to Cloudinary with compression...");
+        const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { 
+            folder: "upscaled_images",
+            format: "jpg",          // PNG/WebP → JPG (bahut smaller hota hai)
+            quality: 82,            // 82% quality = visually lossless, ~70% size reduction
+        });
         const permanentUrl = uploadResult.secure_url;
+        console.log("✅ [UPSCALE] Cloudinary upload done:", permanentUrl);
 
         user.credits -= 1;
         await user.save();

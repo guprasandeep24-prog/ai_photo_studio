@@ -273,9 +273,9 @@
         </div>
     </div>
 
-    <!-- ✅ FIX: Success Modal with enhanceBtn added -->
-    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900">
+    <!-- ✅ FIX: Success Modal - scrollable + Try Another Way button working -->
+    <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-start justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900 my-auto mt-4 mb-4">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
             <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
             <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
@@ -301,8 +301,8 @@
                 <button id="enhanceBtn" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Enhance to 4K ✨
                 </button>
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition">
-                    Try another way
+                <button onclick="tryAnotherWay()" class="w-full bg-slate-100 text-slate-900 py-3 rounded-xl font-bold hover:bg-slate-200 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrow-left text-sm"></i> Try Another Way
                 </button>
             </div>
         </div>
@@ -698,6 +698,46 @@
     });
 
     window.handleLogout = async () => { await signOut(auth); location.reload(); };
+
+    // ✅ NEW: Try Another Way - page reload nahi, wapas categories page pe jaao
+    window.tryAnotherWay = () => {
+        // Success modal band karo
+        document.getElementById('successModal').classList.add('hidden');
+
+        // Result image reset karo
+        document.getElementById('resultImage').src = '';
+        document.getElementById('downloadBtn').href = '#';
+
+        // Comparison slider reset
+        document.getElementById('beforeImageWrapper').style.display = 'block';
+        document.getElementById('sliderHandle').style.display = 'flex';
+        document.getElementById('comparisonSlider').style.display = 'block';
+        document.getElementById('comparisonSlider').value = 50;
+        document.getElementById('beforeImageWrapper').style.width = '50%';
+
+        // Upload section band karo
+        document.getElementById('upload-section').classList.add('hidden');
+        // Dashboard hidden karo
+        document.getElementById('dashboard-section').classList.add('hidden');
+        // Categories section dikhao
+        document.getElementById('categories-section').classList.remove('hidden');
+
+        // Sab states reset karo
+        window.selectedCategory = '';
+        window.selectedGender = '';
+        window.selectedFile = null;
+        window.selectedTemplateIndex = null;
+        window.portraitFile = null;
+        document.getElementById('imageInput').value = '';
+        document.getElementById('preview-container').classList.add('hidden');
+        document.getElementById('submitBtn').classList.add('hidden');
+        document.getElementById('btn-man').classList.remove('active');
+        document.getElementById('btn-woman').classList.remove('active');
+        document.getElementById('template-selection-container').classList.add('hidden');
+
+        // Page top pe scroll karo
+        document.getElementById('categories-section').scrollIntoView({ behavior: 'smooth' });
+    };
 
     async function fetchTemplatesFromServer() {
         try {
