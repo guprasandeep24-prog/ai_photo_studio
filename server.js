@@ -97,22 +97,22 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 async function runAIFaceSwap(userCloudinaryUrl, targetImageUrl) {
-    console.log("🤖 [AI] Starting Replicate Face-Swap...");
+    console.log("\u{1F916} [AI] Starting Replicate Face-Swap...");
+    console.log("   swap_image  :", userCloudinaryUrl);
+    console.log("   target_image:", targetImageUrl);
     try {
         const output = await replicate.run(
             "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a879c1f7af92e2a3b00", 
             { input: { target_image: targetImageUrl, swap_image: userCloudinaryUrl } }
         );
 
-        if (typeof output === 'string' && output.startsWith('http')) return output;
-        if (Array.isArray(output) && output.length > 0) return output[0];
-        if (output && typeof output === 'object') {
-            const urlFromObj = output.output || output.url || output.image;
-            if (typeof urlFromObj === 'string' && urlFromObj.startsWith('http')) return urlFromObj;
-        }
+        // parseReplicateUrl is defined below — handles old string + new SDK FileOutput
+        const result = parseReplicateUrl(output);
+        if (result) return result;
+
         throw new Error("AI returned unparseable format");
     } catch (error) {
-        console.error("❌ [AI ERROR]:", error.message);
+        console.error("\u274C [AI ERROR]:", error.message);
         throw error;
     }
 }
@@ -341,14 +341,25 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
             input: { prompt: prompt, num_outputs: 1, num_inference_steps: 4 }
         });
 
-        // ✅ FIX: parseReplicateUrl use karo - ye pehle fail ho raha tha kyunki
-        // nayi Replicate SDK FileOutput object return karti hai, raw string nahi
+        // ✅ FIX: parseReplicateUrl use karo (new SDK FileOutput handle hoga)
         const sceneUrl = parseReplicateUrl(sceneOutput);
         if (!sceneUrl) throw new Error("Scene generation from prompt failed");
-        console.log("🎨 [MAGIC PORTRAIT] Scene generated:", sceneUrl);
+        console.log("\u{1F3A8} [MAGIC PORTRAIT] Scene generated (temp URL):", sceneUrl);
 
-        // Step 3: Face swap user's face into the generated scene
-        const faceSwappedUrl = await runAIFaceSwap(userImageUrl, sceneUrl);
+        // ✅ FIX: replicate.delivery URLs temporary hoti hain + .webp format
+        // Face-swap model inhe access nahi kar paata
+        // Solution: Scene ko pehle Cloudinary mein permanent JPG URL mein convert karo
+        console.log("\u{2601}\u{FE0F}  [MAGIC PORTRAIT] Uploading scene to Cloudinary for permanent URL...");
+        const sceneUpload = await cloudinary.uploader.upload(sceneUrl, {
+            folder: "scene_inputs",
+            format: "jpg",         // webp → jpg convert (face-swap model jpg prefer karta hai)
+            quality: "auto:good"
+        });
+        const permanentSceneUrl = sceneUpload.secure_url;
+        console.log("\u2705 [MAGIC PORTRAIT] Scene permanent URL ready:", permanentSceneUrl);
+
+        // Step 3: Face swap user's face into the permanent scene image
+        const faceSwappedUrl = await runAIFaceSwap(userImageUrl, permanentSceneUrl);
         console.log("🔄 [MAGIC PORTRAIT] Face swap done:", faceSwappedUrl);
 
         // Step 4: Save result permanently in Cloudinary
