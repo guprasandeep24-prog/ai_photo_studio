@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "sharp": "^0.33.5",
+    "nodemailer": "^6.9.14",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
