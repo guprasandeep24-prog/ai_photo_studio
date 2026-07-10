@@ -4,9 +4,20 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
+
+// Sharp: image compression library (run: npm install sharp)
+let sharp;
+try {
+    sharp = require('sharp');
+    console.log("✅ [SYSTEM] Sharp loaded — image compression ready");
+} catch(e) {
+    console.error("❌ [SYSTEM] Sharp not found! Run: npm install sharp");
+}
 
 const Order = require('./models/Order');
 const User = require('./models/User'); 
@@ -162,6 +173,51 @@ async function getResizedImageUrl(imageUrl, maxDim = 1400) {
     }
 }
 
+// ✅ NEW HELPER: Image download karo → Sharp se compress karo → Cloudinary pe upload karo
+// Ye Cloudinary 10MB limit fix karta hai bina plan upgrade kiye
+// Real-ESRGAN output 32MB PNG hoti hai → ye 2-4MB JPEG banata hai
+async function downloadBuffer(url) {
+    return new Promise((resolve, reject) => {
+        const protocol = url.startsWith('https') ? https : http;
+        const req = protocol.get(url, (res) => {
+            // Handle HTTP redirects (302, 301)
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                return downloadBuffer(res.headers.location).then(resolve).catch(reject);
+            }
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => resolve(Buffer.concat(chunks)));
+            res.on('error', reject);
+        });
+        req.on('error', reject);
+    });
+}
+
+async function compressAndUpload(imageUrl, folder, quality = 82) {
+    if (!sharp) throw new Error("Sharp not installed. Run in project folder: npm install sharp");
+
+    console.log(`⬇️  [COMPRESS] Downloading image from: ${imageUrl.substring(0, 60)}...`);
+    const buffer = await downloadBuffer(imageUrl);
+    const originalMB = (buffer.length / 1024 / 1024).toFixed(1);
+    console.log(`📦 [COMPRESS] Original size: ${originalMB}MB`);
+
+    // JPEG compression: 32MB PNG → typically 2-5MB JPEG at quality 82
+    const compressed = await sharp(buffer)
+        .jpeg({ quality, progressive: true })
+        .toBuffer();
+    const compressedMB = (compressed.length / 1024 / 1024).toFixed(1);
+    console.log(`✅ [COMPRESS] Compressed: ${originalMB}MB → ${compressedMB}MB (${quality}% quality JPEG)`);
+
+    // Upload compressed buffer as stream to Cloudinary
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder },
+            (err, result) => err ? reject(err) : resolve(result)
+        );
+        stream.end(compressed);
+    });
+}
+
 app.get('/', (req, res) => res.send("🚀 AI Photo Studio Backend is LIVE!"));
 app.get('/templates', (req, res) => { res.json(TEMPLATES); });
 
@@ -295,14 +351,11 @@ app.post('/upscale', async (req, res) => {
         const upscaledUrl = parseReplicateUrl(output);
         if (!upscaledUrl) throw new Error("Upscaling returned no result");
 
-        // ✅ FIX: Cloudinary free plan limit 10MB hai, upscaled image 29MB tak ho sakti hai
-        // Solution: JPG format + quality compression se file size 3-5MB tak aa jaati hai
-        console.log("💾 [UPSCALE] Uploading to Cloudinary with compression...");
-        const uploadResult = await cloudinary.uploader.upload(upscaledUrl, { 
-            folder: "upscaled_images",
-            format: "jpg",          // PNG/WebP → JPG (bahut smaller hota hai)
-            quality: 82,            // 82% quality = visually lossless, ~70% size reduction
-        });
+        // ✅ FIX: compressAndUpload use karo
+        // Pehle HUMARE server pe compress hoga (32MB → ~3MB), tab Cloudinary pe jayega
+        // Cloudinary format:"jpg" + quality params DOWNLOAD KE BAAD lagte hain — isliye pehle fail tha
+        console.log("💾 [UPSCALE] Compressing locally then uploading to Cloudinary...");
+        const uploadResult = await compressAndUpload(upscaledUrl, "upscaled_images", 82);
         const permanentUrl = uploadResult.secure_url;
         console.log("✅ [UPSCALE] Cloudinary upload done:", permanentUrl);
 
