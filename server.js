@@ -10,14 +10,6 @@ const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
 
-// Sharp: image compression library (run: npm install sharp)
-let sharp;
-try {
-    sharp = require('sharp');
-    console.log("✅ [SYSTEM] Sharp loaded — image compression ready");
-} catch(e) {
-    console.error("❌ [SYSTEM] Sharp not found! Run: npm install sharp");
-}
 
 const Order = require('./models/Order');
 const User = require('./models/User'); 
@@ -334,14 +326,14 @@ app.post('/upscale', async (req, res) => {
 
         console.log("✨ [UPSCALE] Starting 4K Enhancement...");
 
-        // ✅ FIX: GPU memory error - image ko pehle resize karo (max 1400x1400)
-        // Real-ESRGAN GPU limit: ~2,096,704 pixels. 5472x3648 = 19.9M pixels → ERROR!
-        // Solution: 1400x1400 = 1.96M pixels → GPU limit ke andar rahega
-        console.log("⚙️ [UPSCALE] Resizing image for GPU compatibility...");
-        const resizedImageUrl = await getResizedImageUrl(imageUrl, 1400);
-        console.log("✅ [UPSCALE] Resized URL ready:", resizedImageUrl);
+        // FIX: CUDA Out of Memory
+        // 1400px input x scale 4 = 5600x5600 output = 3.74 GiB GPU memory chahiye = CRASH
+        //  500px input x scale 4 = 2000x2000 output = ~0.4 GiB GPU memory = WORKS
+        console.log("[UPSCALE] Resizing to 500px for GPU memory compatibility...");
+        const resizedImageUrl = await getResizedImageUrl(imageUrl, 500);
+        console.log("[UPSCALE] Resized URL ready:", resizedImageUrl);
 
-        // Real-ESRGAN model for 4x upscaling with face enhancement
+        // Real-ESRGAN: 500x500 input = 2000x2000 output (4x scale, face_enhance on)
         const output = await replicate.run(
             "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b",
             { input: { image: resizedImageUrl, scale: 4, face_enhance: true } }
