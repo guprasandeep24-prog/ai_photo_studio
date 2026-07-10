@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
+const sharp = require('sharp');
 const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
@@ -186,8 +187,6 @@ async function downloadBuffer(url) {
 }
 
 async function compressAndUpload(imageUrl, folder, quality = 82) {
-    if (!sharp) throw new Error("Sharp not installed. Run in project folder: npm install sharp");
-
     console.log(`⬇️  [COMPRESS] Downloading image from: ${imageUrl.substring(0, 60)}...`);
     const buffer = await downloadBuffer(imageUrl);
     const originalMB = (buffer.length / 1024 / 1024).toFixed(1);
