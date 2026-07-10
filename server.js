@@ -7,6 +7,7 @@ const fs = require('fs');
 const https = require('https');
 const http = require('http');
 const sharp = require('sharp');
+const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
@@ -38,6 +39,117 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+// ============================================================
+// EMAIL SETUP — Gmail SMTP via Nodemailer
+// .env mein add karo: EMAIL_USER aur EMAIL_PASS
+// EMAIL_PASS = Gmail App Password (16 characters)
+// Gmail → Settings → Security → 2-Step Verification ON karo
+// Then: App Passwords → Generate → copy 16-char password
+// ============================================================
+const emailTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// Category display names for email subject
+const CATEGORY_NAMES = {
+    'linkedin'      : 'LinkedIn Professional',
+    'wedding'       : 'Wedding Royal Look',
+    'fashion'       : 'Fashion Style',
+    'magic-prompt'  : 'Magic Prompt Creation',
+    'magic-portrait': 'Magic Portrait',
+    'upscale'       : '4K Enhanced Photo'
+};
+
+// Photo email bhejne ka function — email fail hone par bhi API response rukta nahi
+async function sendPhotoEmail(toEmail, imageUrl, category) {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn("⚠️  [EMAIL] EMAIL_USER ya EMAIL_PASS .env mein nahi hai — email skip");
+        return;
+    }
+
+    const categoryName = CATEGORY_NAMES[category] || 'AI Generated Photo';
+
+    const mailOptions = {
+        from: `"AI Photo Studio ✨" <${process.env.EMAIL_USER}>`,
+        to: toEmail,
+        subject: `✨ Aapki ${categoryName} Photo Ready Hai!`,
+        html: `
+        <!DOCTYPE html>
+        <html lang="hi">
+        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+        <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:30px 0;">
+            <tr><td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#1e293b;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+
+                <!-- Header -->
+                <tr>
+                  <td style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);padding:36px 40px;text-align:center;">
+                    <div style="font-size:28px;font-weight:900;color:white;letter-spacing:-1px;">
+                      AI PHOTO<span style="color:#a5b4fc;">Studio</span>
+                    </div>
+                    <p style="color:#c4b5fd;margin:8px 0 0;font-size:14px;">Professional AI Transformations</p>
+                  </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                  <td style="padding:40px 40px 30px;text-align:center;">
+                    <h2 style="color:white;font-size:22px;margin:0 0 8px;">
+                      🎉 Aapki Photo Ready Hai!
+                    </h2>
+                    <p style="color:#94a3b8;font-size:14px;margin:0 0 28px;">
+                      ${categoryName} — AI transformation complete!
+                    </p>
+
+                    <!-- Photo -->
+                    <div style="border-radius:16px;overflow:hidden;margin-bottom:28px;border:2px solid #334155;">
+                      <img src="${imageUrl}" 
+                           alt="Aapki AI Photo"
+                           width="100%"
+                           style="display:block;width:100%;max-height:400px;object-fit:cover;">
+                    </div>
+
+                    <!-- Download Button -->
+                    <a href="${imageUrl}" 
+                       target="_blank"
+                       style="display:inline-block;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:white;text-decoration:none;padding:16px 40px;border-radius:50px;font-size:16px;font-weight:bold;margin-bottom:16px;">
+                      ⬇️ Download Karo
+                    </a>
+
+                    <p style="color:#475569;font-size:12px;margin:16px 0 0;">
+                      Yeh photo sirf aapke liye AI ne banai hai.<br>
+                      Credits use: 1 credit
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding:20px 40px;border-top:1px solid #334155;text-align:center;">
+                    <p style="color:#475569;font-size:11px;margin:0;">
+                      © AI Photo Studio — Professional AI Transformations<br>
+                      Yeh automated email hai. Reply mat karo.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td></tr>
+          </table>
+        </body>
+        </html>
+        `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+    console.log(`✅ [EMAIL] Photo email sent to: ${toEmail}`);
+}
 
 const TEMPLATES = {
     'linkedin': { 
@@ -271,6 +383,12 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         await newOrder.save();
 
         if (req.file) fs.unlinkSync(req.file.path);
+
+        // Email bhejo (fail hone par bhi response rukta nahi)
+        sendPhotoEmail(email, aiImageUrl, category).catch(err =>
+            console.error("⚠️  [EMAIL] Send failed:", err.message)
+        );
+
         res.json({ success: true, ai_image_url: aiImageUrl, original_image_url: originalImageUrl });
 
     } catch (error) {
@@ -307,6 +425,11 @@ app.post('/magic-prompt', async (req, res) => {
             userId, email, category: 'magic-prompt', aiImageUrl: permanentUrl, originalImageUrl: "", status: 'completed'
         });
         await newOrder.save();
+
+        // Email bhejo
+        sendPhotoEmail(email, permanentUrl, 'magic-prompt').catch(err =>
+            console.error("⚠️  [EMAIL] Send failed:", err.message)
+        );
 
         res.json({ success: true, ai_image_url: permanentUrl });
     } catch (error) {
@@ -428,6 +551,12 @@ app.post('/magic-portrait', upload.single('image'), async (req, res) => {
         await newOrder.save();
 
         if (req.file) fs.unlinkSync(req.file.path);
+
+        // Email bhejo
+        sendPhotoEmail(email || req.body.email, permanentUrl, 'magic-portrait').catch(err =>
+            console.error("⚠️  [EMAIL] Send failed:", err.message)
+        );
+
         console.log("✅ [MAGIC PORTRAIT] Complete:", permanentUrl);
         res.json({ success: true, ai_image_url: permanentUrl, original_image_url: userImageUrl });
 
