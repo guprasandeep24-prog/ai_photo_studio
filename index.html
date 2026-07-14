@@ -6,8 +6,6 @@
     <title>AI Photo Studio | Professional AI Transformation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Razorpay: lazily loaded only when user clicks Buy (prevents tab spinning) -->
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-1EE8MG0DHL"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -29,7 +27,7 @@
         .glass {
             background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            -webkit-backdropfilter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -272,7 +270,7 @@
         </div>
     </div>
 
-    <!-- ✅ FIX: Success Modal - scrollable + Try Another Way button working -->
+    <!-- ✅ SUCCESS MODAL -->
     <div id="successModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-start justify-center z-50 p-4 overflow-y-auto">
         <div class="bg-white p-6 rounded-[2rem] text-center max-w-sm w-full shadow-2xl text-slate-900 my-auto mt-4 mb-4">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
@@ -296,7 +294,6 @@
                 <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
                     <i class="fa-solid fa-download mr-2"></i> Download
                 </a>
-                <!-- ✅ FIX: enhanceBtn ab yahan hai - pehle missing tha! -->
                 <button id="enhanceBtn" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Enhance to 4K ✨
                 </button>
@@ -341,8 +338,27 @@
     const auth = getAuth(app);
     const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
 
+    // ✅ ULTIMATE LOADING MANAGER
+    window.setLoadingState = (isLoading, type = 'global') => {
+        const modal = document.getElementById('loadingModal');
+        if (isLoading) modal.classList.remove('hidden');
+        else modal.classList.add('hidden');
+
+        if (type === 'portrait') {
+            const btnText = document.getElementById('portrait-btn-text');
+            const btnSpinner = document.getElementById('portrait-btn-spinner');
+            if (isLoading) {
+                btnText.classList.add('hidden');
+                btnSpinner.classList.remove('hidden');
+            } else {
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+            }
+        }
+    };
+
     // Global helper for fetch with automatic timeout
-    async function fetchWithTimeout(url, options, timeoutMs = 120000) {
+    async function fetchWithTimeout(url, options, timeoutMs = 150000) {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeoutMs);
         try {
@@ -362,7 +378,7 @@
     window.isLoginMode = true;
     window.selectedTemplateIndex = null;
     window.allTemplates = {};
-    window.portraitFile = null; // ✅ NEW: Magic Portrait ke liye
+    window.portraitFile = null;
 
     window.toggleAuthModal = () => document.getElementById('authModal').classList.toggle('hidden');
     window.togglePricingModal = () => document.getElementById('pricingModal').classList.toggle('hidden');
@@ -399,24 +415,17 @@
     window.handleUpscale = async function() {
         const user = auth.currentUser;
         const currentImageUrl = document.getElementById('resultImage').src;
-
         if (!user) return alert("Please Login first!");
         if (!currentImageUrl) return alert("No image to upscale!");
 
-        document.getElementById('loadingModal').classList.remove('hidden');
-
+        window.setLoadingState(true, 'global');
         try {
             const response = await fetchWithTimeout(`${BASE_URL}/upscale`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.uid,
-                    email: user.email,
-                    imageUrl: currentImageUrl
-                })
-            }, 180000); // 3 min timeout for upscaling
+                body: JSON.stringify({ userId: user.uid, email: user.email, imageUrl: currentImageUrl })
+            });
             const result = await response.json();
-
             if (result.success) {
                 document.getElementById('resultImage').src = result.ai_image_url;
                 document.getElementById('downloadBtn').href = result.ai_image_url;
@@ -425,31 +434,23 @@
                 throw new Error(result.error || "Upscaling failed");
             }
         } catch (error) {
-            const msg = error.name === 'AbortError' ? "Request timed out. AI is taking too long." : error.message;
-            alert("❌ Error: " + msg);
+            alert("❌ Error: " + (error.name === 'AbortError' ? "Timeout. Try again." : error.message));
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden');
+            window.setLoadingState(false, 'global');
         }
     };
 
     window.handleGalleryUpscale = async function(btn, imageUrl) {
         const user = auth.currentUser;
         if (!user) return alert("Please Login first!");
-
-        document.getElementById('loadingModal').classList.remove('hidden');
-
+        window.setLoadingState(true, 'global');
         try {
             const response = await fetchWithTimeout(`${BASE_URL}/upscale`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.uid,
-                    email: user.email,
-                    imageUrl: imageUrl
-                })
-            }, 180000);
+                body: JSON.stringify({ userId: user.uid, email: user.email, imageUrl: imageUrl })
+            });
             const result = await response.json();
-
             if (result.success) {
                 const card = btn.closest('.bg-gray-800');
                 const img = card.querySelector('img');
@@ -459,14 +460,12 @@
                 throw new Error(result.error || "Upscaling failed");
             }
         } catch (error) {
-            const msg = error.name === 'AbortError' ? "Timeout: Try again." : error.message;
-            alert("❌ Error: " + msg);
+            alert("❌ Error: " + (error.name === 'AbortError' ? "Timeout. Try again." : error.message));
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden');
+            window.setLoadingState(false, 'global');
         }
     };
 
-    // ✅ FIX: enhanceBtn ab HTML mein hai, to ye handler kaam karega
     document.getElementById('enhanceBtn').onclick = window.handleUpscale;
 
     // --- MAGIC PROMPT ---
@@ -479,83 +478,70 @@
     document.getElementById('magicSubmitBtn').addEventListener('click', async function() {
         const user = auth.currentUser;
         const promptText = document.getElementById('promptInput').value.trim();
-
         if (!user) return alert("Please Login first!");
         if (!promptText) return alert("Please enter a prompt!");
 
-        document.getElementById('loadingModal').classList.remove('hidden');
-
+        window.setLoadingState(true, 'global');
         try {
             const response = await fetchWithTimeout(`${BASE_URL}/magic-prompt`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.uid,
-                    email: user.email,
-                    prompt: promptText
-                })
+                body: JSON.stringify({ userId: user.uid, email: user.email, prompt: promptText })
             });
-
-            const result = await response.json();
+            
+            // BUFFER CHECK: Validate JSON
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                throw new Error("Server returned invalid data. Try a shorter prompt.");
+            }
 
             if (result.success) {
                 document.getElementById('resultImage').src = result.ai_image_url;
                 document.getElementById('downloadBtn').href = result.ai_image_url;
-                
                 document.getElementById('successTitle').innerText = "Magic Done!";
                 document.getElementById('successSubtitle').innerText = "Your masterpiece is ready.";
                 document.getElementById('beforeImageWrapper').style.display = 'none';
                 document.getElementById('sliderHandle').style.display = 'none';
                 document.getElementById('comparisonSlider').style.display = 'none';
-
                 closeMagicPrompt();
                 document.getElementById('successModal').classList.remove('hidden');
             } else {
                 throw new Error(result.error || "Generation failed");
             }
         } catch (error) {
-            const msg = error.name === 'AbortError' ? "AI is taking too long. Try a shorter prompt." : error.message;
-            alert("❌ Error: " + msg);
+            alert("❌ Error: " + (error.name === 'AbortError' ? "AI is taking too long. Try again." : error.message));
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden');
+            window.setLoadingState(false, 'global');
         }
     });
 
-    // ✅ NEW: MAGIC PORTRAIT - Open/Close functions (pehle ye define hi nahi thi!)
-    window.openMagicPortrait = () => {
-        document.getElementById('magicPortraitModal').classList.remove('hidden');
-    };
-
+    // --- MAGIC PORTRAIT ---
+    window.openMagicPortrait = () => document.getElementById('magicPortraitModal').classList.remove('hidden');
     window.closeMagicPortrait = () => {
         document.getElementById('magicPortraitModal').classList.add('hidden');
         document.getElementById('portrait-prompt-input').value = '';
-        // Reset file preview
         window.portraitFile = null;
         document.getElementById('portrait-file-input').value = '';
         document.getElementById('portrait-image-preview').classList.add('hidden');
-        document.getElementById('portrait-image-preview').src = '';
         document.getElementById('upload-placeholder').classList.remove('hidden');
         document.getElementById('remove-portrait-btn').classList.add('hidden');
-        // Reset button state
-        document.getElementById('portrait-btn-text').classList.remove('hidden');
-        document.getElementById('portrait-btn-spinner').classList.add('hidden');
+        window.setLoadingState(false, 'portrait');
     };
 
-    // ✅ NEW: Portrait file upload preview handler (pehle ye missing tha!)
     const portraitUploadWrapper = document.getElementById('portrait-upload-wrapper');
     const portraitFileInput = document.getElementById('portrait-file-input');
     const portraitImagePreview = document.getElementById('portrait-image-preview');
     const uploadPlaceholder = document.getElementById('upload-placeholder');
     const removePortraitBtn = document.getElementById('remove-portrait-btn');
 
-    // Click on wrapper → open file picker (but not if clicking remove button)
     portraitUploadWrapper.addEventListener('click', (e) => {
         if (e.target !== removePortraitBtn && !removePortraitBtn.contains(e.target)) {
             portraitFileInput.click();
         }
     });
 
-    // File selected → show preview
     portraitFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
@@ -571,18 +557,16 @@
         }
     });
 
-    // Remove button → clear preview
     removePortraitBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         window.portraitFile = null;
         portraitFileInput.value = '';
         portraitImagePreview.classList.add('hidden');
-        portraitImagePreview.src = '';
         uploadPlaceholder.classList.remove('hidden');
         removePortraitBtn.classList.add('hidden');
     });
 
-    // ✅ NEW: Magic Portrait SUBMIT handler (pehle ye completely missing tha!)
+    // ✅ FIXED: MAGIC PORTRAIT SUBMIT HANDLER (BULLPROOF)
     document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
         const user = auth.currentUser;
         const prompt = document.getElementById('portrait-prompt-input').value.trim();
@@ -591,10 +575,8 @@
         if (!window.portraitFile) return alert("Please upload your photo first!");
         if (!prompt) return alert("Please describe your new look!");
 
-        // Show loading state on button
-        document.getElementById('portrait-btn-text').classList.add('hidden');
-        document.getElementById('portrait-btn-spinner').classList.remove('hidden');
-        document.getElementById('loadingModal').classList.remove('hidden');
+        // Start Loading
+        window.setLoadingState(true, 'portrait');
 
         try {
             const formData = new FormData();
@@ -603,37 +585,38 @@
             formData.append('prompt', prompt);
             formData.append('image', window.portraitFile);
 
-            // 3 minute timeout for magic portrait (3 AI steps run)
             const response = await fetchWithTimeout(`${BASE_URL}/magic-portrait`, {
                 method: 'POST',
                 body: formData
-            }, 180000);
+            });
 
-            const result = await response.json();
+            // CRITICAL: Handle JSON error properly
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                throw new Error("Server Error. AI took too long or crashed.");
+            }
 
             if (result.success) {
-                // Show result in success modal
                 document.getElementById('resultImage').src = result.ai_image_url;
                 document.getElementById('downloadBtn').href = result.ai_image_url;
                 document.getElementById('successTitle').innerText = "Portrait Ready! 🎭";
                 document.getElementById('successSubtitle').innerText = "Your magical portrait is ready.";
-                // Hide comparison slider (no before/after for portrait)
                 document.getElementById('beforeImageWrapper').style.display = 'none';
                 document.getElementById('sliderHandle').style.display = 'none';
                 document.getElementById('comparisonSlider').style.display = 'none';
-
                 closeMagicPortrait();
                 document.getElementById('successModal').classList.remove('hidden');
             } else {
                 throw new Error(result.error || "Portrait generation failed");
             }
         } catch (error) {
-            const msg = error.name === 'AbortError' ? "AI is taking too long. Please try again." : error.message;
-            alert("❌ Error: " + msg);
+            console.error("❌ Error:", error);
+            alert("❌ " + (error.name === 'AbortError' ? "Timeout! Try again." : error.message));
         } finally {
-            document.getElementById('portrait-btn-text').classList.remove('hidden');
-            document.getElementById('portrait-btn-spinner').classList.add('hidden');
-            document.getElementById('loadingModal').classList.add('hidden');
+            // NO MATTER WHAT HAPPENS, HIDE SPINNER
+            window.setLoadingState(false, 'portrait');
         }
     });
 
@@ -642,7 +625,7 @@
         const user = auth.currentUser;
         if (!user) return alert("Please Login first!");
         if (!window.selectedCategory || !window.selectedGender || window.selectedTemplateIndex === null || !window.selectedFile) {
-            return alert("Please complete all steps (Category, Gender, Style, and Photo)");
+            return alert("Please complete all steps!");
         }
 
         const formData = new FormData();
@@ -653,7 +636,7 @@
         formData.append('templateIndex', window.selectedTemplateIndex); 
         formData.append('image', window.selectedFile);
 
-        document.getElementById('loadingModal').classList.remove('hidden');
+        window.setLoadingState(true, 'global');
 
         try {
             const response = await fetchWithTimeout(`${BASE_URL}/upload`, { 
@@ -661,7 +644,10 @@
                 body: formData 
             });
             
-            const result = await response.json();
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) { throw new Error("Server error during generation."); }
             
             if (result.success) {
                 document.getElementById('successTitle').innerText = "Magic Done!";
@@ -675,7 +661,6 @@
                 document.getElementById('downloadBtn').href = result.ai_image_url;
                 document.getElementById('successModal').classList.remove('hidden');
                 
-                // Slider Init
                 const slider = document.getElementById('comparisonSlider');
                 const beforeWrapper = document.getElementById('beforeImageWrapper');
                 const handle = document.getElementById('sliderHandle');
@@ -689,43 +674,28 @@
                 throw new Error(result.error || "AI Generation failed");
             }
         } catch (error) {
-            const msg = error.name === 'AbortError' ? "Connection timed out. The AI task is too heavy." : error.message;
-            alert("❌ Error: " + msg);
+            alert("❌ " + error.message);
         } finally {
-            document.getElementById('loadingModal').classList.add('hidden');
+            window.setLoadingState(false, 'global');
         }
     });
 
     window.handleLogout = async () => { await signOut(auth); location.reload(); };
 
-    // ✅ NEW: Try Another Way - page reload nahi, wapas categories page pe jaao
     window.tryAnotherWay = () => {
-        // Success modal band karo
         document.getElementById('successModal').classList.add('hidden');
-
-        // Result image reset karo
         document.getElementById('resultImage').src = '';
         document.getElementById('downloadBtn').href = '#';
-
-        // Comparison slider reset
         document.getElementById('beforeImageWrapper').style.display = 'block';
         document.getElementById('sliderHandle').style.display = 'flex';
         document.getElementById('comparisonSlider').style.display = 'block';
         document.getElementById('comparisonSlider').value = 50;
         document.getElementById('beforeImageWrapper').style.width = '50%';
-
-        // Upload section band karo
         document.getElementById('upload-section').classList.add('hidden');
-        // Dashboard hidden karo
         document.getElementById('dashboard-section').classList.add('hidden');
-        // Categories section dikhao
         document.getElementById('categories-section').classList.remove('hidden');
 
-        // Sab states reset karo
-        window.selectedCategory = '';
-        window.selectedGender = '';
-        window.selectedFile = null;
-        window.selectedTemplateIndex = null;
+        window.selectedCategory = ''; window.selectedGender = ''; window.selectedTemplateIndex = null;
         window.portraitFile = null;
         document.getElementById('imageInput').value = '';
         document.getElementById('preview-container').classList.add('hidden');
@@ -733,8 +703,6 @@
         document.getElementById('btn-man').classList.remove('active');
         document.getElementById('btn-woman').classList.remove('active');
         document.getElementById('template-selection-container').classList.add('hidden');
-
-        // Page top pe scroll karo
         document.getElementById('categories-section').scrollIntoView({ behavior: 'smooth' });
     };
 
@@ -742,7 +710,7 @@
         try {
             const res = await fetch(`${BASE_URL}/templates`);
             window.allTemplates = await res.json();
-        } catch (err) { console.error("❌ Failed to fetch templates:", err); }
+        } catch (err) { console.error("❌ Templates error:", err); }
     }
 
     window.displayTemplates = (category, gender) => {
@@ -840,7 +808,6 @@
     async function fetchUserPhotos(userId) {
         const grid = document.getElementById('photo-grid');
         const noPhotosMsg = document.getElementById('no-photos-msg');
-        
         try {
             const response = await fetch(`${BASE_URL}/my-photos?userId=${userId}`);
             const photos = await response.json();
@@ -890,11 +857,9 @@
         }
     });
 
-    // Razorpay: sirf tab load karo jab user Buy click kare
-    // Isse page load pe browser tab spinning band ho jaayega
     async function loadRazorpaySDK() {
         return new Promise((resolve, reject) => {
-            if (window.Razorpay) { resolve(); return; } // already loaded
+            if (window.Razorpay) { resolve(); return; }
             const script = document.createElement('script');
             script.src = 'https://checkout.razorpay.com/v1/checkout.js';
             script.onload = () => resolve();
@@ -907,7 +872,6 @@
         const user = auth.currentUser;
         if (!user) return alert("Please login first!");
         try {
-            // Razorpay SDK load karo (pehli baar thodi der lagegi, baad mein instant)
             await loadRazorpaySDK();
             const response = await fetch(`${BASE_URL}/api/payments/create-order`, {
                 method: 'POST',
@@ -981,8 +945,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         startTimer(86400); 
     });
-    startTimer(86400);
 </script>
-
 </body>
 </html>

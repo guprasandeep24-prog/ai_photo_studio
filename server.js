@@ -68,40 +68,6 @@ function parseReplicateUrl(output) {
     return null;
 }
 
-async function getResizedImageUrl(imageUrl, maxDim = 1400) {
-    if (imageUrl && imageUrl.includes('res.cloudinary.com')) {
-        return imageUrl.replace('/upload/', `/upload/w_${maxDim},h_${maxDim},c_fit/`);
-    }
-    const result = await cloudinary.uploader.upload(imageUrl, {
-        folder: "resized_inputs",
-        transformation: [{ width: maxDim, height: maxDim, crop: 'fit' }]
-    });
-    return result.secure_url;
-}
-
-async function downloadBuffer(url) {
-    return new Promise((resolve, reject) => {
-        const protocol = url.startsWith('https') ? https : http;
-        const req = protocol.get(url, (res) => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.on('end', () => resolve(Buffer.concat(chunks)));
-            res.on('error', reject);
-        });
-        req.on('error', reject);
-    });
-}
-
-async function compressAndUpload(imageUrl, folder, quality = 82) {
-    const buffer = await downloadBuffer(imageUrl);
-    const compressed = await sharp(buffer).jpeg({ quality, progressive: true }).toBuffer();
-    const uploadResult = await cloudinary.uploader.upload_stream(
-        { folder },
-        (err, result) => err ? reject(err) : resolve(result)
-    ).end(compressed);
-    return uploadResult;
-}
-
 async function sendPhotoEmail(toEmail, imageUrl, category) {
     try {
         const categoryName = CATEGORY_NAMES[category] || 'AI Photo';
@@ -123,7 +89,6 @@ async function sendPhotoEmail(toEmail, imageUrl, category) {
     }
 }
 
-// --- MIDDLEWARE ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -163,13 +128,14 @@ app.get('/user-profile/:userId', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
+// FACE SWAP (LINKEDIN/WEDDING/FASHION)
 app.post('/upload', upload.single('image'), async (req, res) => {
     try {
         const { userId, email, category, gender, templateIndex } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
         if (!user || user.credits <= 0 || !req.file) return res.status(400).json({ success: false, error: "Invalid request" });
         
-        const templates = require('./templates_data')[category][gender]; // assuming templates are in a file
+        const templates = require('./templates_data')[category][gender];
         const targetImg = templates[parseInt(templateIndex)];
 
         const uploadRes = await cloudinary.uploader.upload(req.file.path, { folder: "user_selfies" });
@@ -181,10 +147,13 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         user.credits -= 1; await user.save();
         const order = new Order({ userId, email, category, aiImageUrl: finalImg, originalImageUrl: uploadRes.secure_url, status: 'completed' });
         await order.save();
-        if (req.file) fs.unlinkSync(req.file.path);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         sendPhotoEmail(email, finalImg, category);
         res.json({ success: true, ai_image_url: finalImg });
-    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    } catch (err) { 
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, error: err.message }); 
+    }
 });
 
 // MAGIC PROMPT (Text to Image)
@@ -210,29 +179,27 @@ app.post('/magic-prompt', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// MAGIC PORTRAIT (Image to Image)
-app.post('/api/magic-portrait', upload.single("image"), async (req, res) => {
+// MAGIC PORTRAIT (REMOVED '/api' to match frontend)
+app.post('/magic-portrait', upload.single("image"), async (req, res) => {
     try {
         const { userId, email, prompt } = req.body;
         const user = await User.findOne({ firebaseUid: userId });
         if (!user || user.credits <= 0 || !req.file) return res.status(400).json({ success: false, error: "Invalid Request" });
 
-        // 1. Cloudinary पर यूजर की फोटो अपलोड करें
         const uploadResult = await cloudinary.uploader.upload(req.file.path, { 
             folder: "magic_portrait_inputs" 
         });
         const userImgUrl = uploadResult.secure_url;
 
-        console.log(`[MAGIC PORTRAIT] Sending to Replicate: ${userImgUrl}`);
-
-        // 2. Replicate को 'image' के साथ कॉल करें (सबसे ज़रूरी)
+        // UPGRADED MODEL: SDXL supports both Image and Prompt perfectly
         const output = await replicate.run(
-            "black-forest-labs/flux-schnell", 
+            "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1d712de7dfea5355252857d2152b0a110d7b", 
             {
                 input: {
                     prompt: prompt,
-                    image: userImgUrl,  // 👈 यह लाइन सुनिश्चित करती है कि फोटो AI के पास जाए
-                    num_inference_steps: 4
+                    image: userImgUrl,
+                    refine: "expert_ensemble_refiner",
+                    apply_watermark: false
                 }
             }
         );
@@ -240,17 +207,18 @@ app.post('/api/magic-portrait', upload.single("image"), async (req, res) => {
         const finalUrl = parseReplicateUrl(output);
         const finalUpload = await cloudinary.uploader.upload(finalUrl, { folder: "magic_portrait_results" });
 
-        // 3. क्रेडिट कम करें और डेटाबेस अपडेट करें
         user.credits -= 1; await user.save();
         const order = new Order({ userId, email, category: 'magic-portrait', aiImageUrl: finalUpload.secure_url, status: 'completed' });
         await order.save();
 
-        // 4. ईमेल भेजें
         sendPhotoEmail(email, finalUpload.secure_url, 'magic-portrait').catch(err => console.error(err));
+
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
         res.json({ success: true, ai_image_url: finalUpload.secure_url });
     } catch (err) {
         console.error("❌ [MAGIC PORTRAIT ERROR]:", err.message);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -262,13 +230,13 @@ app.post('/upscale', async (req, res) => {
         const user = await User.findOne({ firebaseUid: userId });
         if (!user || user.credits <= 0) return res.status(400).json({ success: false, error: "No credits" });
 
-        const resized = await getResizedImageUrl(imageUrl, 500);
+        // Fast Resizing to save Replicate bandwidth/speed
         const output = await replicate.run("nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b", {
-            input: { image: resized, scale: 4, face_enhance: true }
+            input: { image: imageUrl, scale: 4, face_enhance: true }
         });
 
         const upscaledUrl = parseReplicateUrl(output);
-        const uploadRes = await compressAndUpload(upscaledUrl, "upscaled_images");
+        const uploadRes = await cloudinary.uploader.upload(upscaledUrl, { folder: "upscaled_images" });
 
         user.credits -= 1; await user.save();
         const order = new Order({ userId, email, category: 'upscale', aiImageUrl: uploadRes.secure_url, originalImageUrl: imageUrl, status: 'completed' });
