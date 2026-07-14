@@ -336,7 +336,7 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const BASE_URL = "https://ai-photo-studio-e3so.onrender.com";
+    const BASE_URL = "https://ai-photo-studio-backend.onrender.com";
 
     // ✅ ULTIMATE LOADING MANAGER
     window.setLoadingState = (isLoading, type = 'global') => {
@@ -358,18 +358,37 @@
     };
 
     // Global helper for fetch with automatic timeout
-    async function fetchWithTimeout(url, options, timeoutMs = 150000) {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-            const response = await fetch(url, { ...options, signal: controller.signal });
-            clearTimeout(id);
-            return response;
-        } catch (error) {
-            clearTimeout(id);
-            throw error;
+    // 🚀 Yeh "Super Debugger" hai. Agar kuch kaam nahi karega, 
+// toh ye spinner band karke bata dega ki "URL galat hai" ya "Server down hai".
+async function fetchWithTimeout(url, options, timeoutMs = 150000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    
+    console.log("📡 Attempting to call:", url); // Debugging ke liye
+
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        
+        if (!response.ok) {
+            // Agar server 404 ya 500 de raha hai, toh yahan se error pakad lo
+            const errorText = await response.text(); 
+            console.error("❌ Server responded with error:", response.status, errorText);
+            throw new Error(`Server Error: ${response.status}`);
         }
+        
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        console.error("❌ Fetch Error:", error.name, error.message);
+        
+        // 💡 Agar URL galat hai toh ye error dikhayega
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            throw new Error("Connection Failed! Check if your BASE_URL is correct.");
+        }
+        throw error;
     }
+}
 
     window.selectedCategory = ""; 
     window.selectedGender = ""; 
