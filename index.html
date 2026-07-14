@@ -276,19 +276,19 @@
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-check"></i></div>
             <h2 id="successTitle" class="text-2xl font-bold mb-1">Magic Done!</h2>
             <p id="successSubtitle" class="text-slate-500 mb-4 text-sm">Your professional photo is ready.</p>
-            
             <div class="relative group mb-6">
-                <div class="comparison-container border-2 border-slate-100 shadow-inner">
-                    <div class="after-image w-full h-full">
-                        <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Image+Error'">
-                    </div>
-                    <div id="beforeImageWrapper" class="before-image">
-                        <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.src='https://via.placeholder.com/400x400?text=Error'">
-                    </div>
-                    <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
-                    <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
-                </div>
-            </div>
+    <div class="comparison-container border-2 border-slate-100 shadow-inner">
+        <div class="after-image w-full h-full">
+            <img id="resultImage" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27400%27%3E%3Crect width=%27400%27 height=%27400%27 fill=%27%23eee%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 dominant-baseline=%27middle%27 text-anchor=%27middle%27 font-family=%27sans-serif%27 font-size=%2724%27 fill=%27%23999%27%3EImage%20Error%3C/text%3E%3C/svg%3E'">
+        </div>
+        <div id="beforeImageWrapper" class="before-image">
+            <img id="originalImagePreview" src="" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27400%27%3E%3Crect width=%27400%27 height=%27400%27 fill=%27%23eee%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 dominant-baseline=%27middle%27 text-anchor=%27middle%27 font-family=%27sans-serif%27 font-size=%2724%27 fill=%27%23999%27%3EError%3C/text%3E%3C/svg%3E'">
+        </div>
+        <div id="sliderHandle" class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+        <input type="range" id="comparisonSlider" class="slider-input" min="0" max="100" value="50">
+    </div>
+</div>
+            
 
             <div class="flex flex-col gap-3">
                 <a id="downloadBtn" href="#" download="my-ai-photo.png" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center">
