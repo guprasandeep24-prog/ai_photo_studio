@@ -290,7 +290,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         const aiOutput = await replicate.run(
             "codeplugtech/face-swap:278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34",
-            { input: { target_image: targetImageUrl, swap_image: originalImageUrl } }
+            { input: { input_image: targetImageUrl, swap_image: originalImageUrl } }
         );
         const aiImageUrl = await resolveToCloudinaryUrl(aiOutput, "ai_studio_generated");
 
