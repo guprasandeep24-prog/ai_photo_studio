@@ -65,6 +65,7 @@ const emailTransporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false, // 587 par STARTTLS use hota hai, secure:false hi sahi hai
+    requireTLS: true, // cloud hosting (Render/Heroku type) par timeout se bachne ka pramukh fix
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -398,7 +399,8 @@ app.post('/magic-portrait', upload.single("image"), async (req, res) => {
                     prompt: prompt,
                     image: capCloudinaryImageSize(userImgUrl),
                     refine: "expert_ensemble_refiner",
-                    apply_watermark: false
+                    apply_watermark: false,
+                    disable_safety_checker: true // SDXL ka built-in filter aksar normal selfies/prompts ko bhi galti se NSFW mark kar deta hai
                 }
             }
         );
