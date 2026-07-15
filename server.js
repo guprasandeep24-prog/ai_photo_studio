@@ -54,12 +54,29 @@ cloudinary.config({
 });
 
 // ---------------- Email Setup ----------------
+// NOTE: "service: 'gmail'" wala purana tareeka kabhi-kabhi cloud hosting (Render)
+// par connection timeout deta hai. Explicit host/port (587 + STARTTLS) zyada
+// reliable hai — yeh Google ka khud recommend kiya hua tareeka hai.
+// ZARURI: EMAIL_PASS mein aapka normal Gmail password NAHI chalega — Google ne
+// yeh band kar diya hai. Isme ek "App Password" (16-character code) dalna
+// hoga, jo Google Account -> Security -> 2-Step Verification -> App Passwords
+// se banta hai (2-Step Verification pehle ON hona zaroori hai).
 const emailTransporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // 587 par STARTTLS use hota hai, secure:false hi sahi hai
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    connectionTimeout: 15000, // 15 second mein fail ho jaaye, hamesha ke liye latka na rahe
+    greetingTimeout: 15000,
+    socketTimeout: 15000
+});
+
+emailTransporter.verify((err) => {
+    if (err) console.error("⚠️ [EMAIL] Transporter setup problem:", err.message);
+    else console.log("✅ [EMAIL] Ready to send emails");
 });
 
 const CATEGORY_NAMES = {
@@ -222,6 +239,16 @@ function cleanupLocalFile(filePath) {
     }
 }
 
+// AI models (khaaskar upscale/face-swap/portrait) chhote GPU par chalte hain,
+// bahut badi photo (jaise 4000x3000 phone camera image) bhejne se
+// "greater than max size that fits in GPU memory" jaisa error aata hai.
+// Yeh function Cloudinary ke URL mein hi ek resize instruction daal deta hai,
+// taaki photo download/resize/re-upload karne ki zaroorat na pade.
+function capCloudinaryImageSize(url, maxDim = 1600) {
+    if (!url || typeof url !== 'string' || !url.includes('/upload/')) return url;
+    return url.replace('/upload/', `/upload/w_${maxDim},h_${maxDim},c_limit/`);
+}
+
 // =====================================================================
 // ROUTES
 // =====================================================================
@@ -290,7 +317,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         const aiOutput = await replicate.run(
             "codeplugtech/face-swap:278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34",
-            { input: { input_image: targetImageUrl, swap_image: originalImageUrl } }
+            { input: { input_image: targetImageUrl, swap_image: capCloudinaryImageSize(originalImageUrl) } }
         );
         const aiImageUrl = await resolveToCloudinaryUrl(aiOutput, "ai_studio_generated");
 
@@ -365,11 +392,11 @@ app.post('/magic-portrait', upload.single("image"), async (req, res) => {
         cleanupLocalFile(req.file.path);
 
         const output = await replicate.run(
-            "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1d712de7dfea5355252857d2152b0a110d7b",
+            "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
             {
                 input: {
                     prompt: prompt,
-                    image: userImgUrl,
+                    image: capCloudinaryImageSize(userImgUrl),
                     refine: "expert_ensemble_refiner",
                     apply_watermark: false
                 }
@@ -408,7 +435,7 @@ app.post('/upscale', async (req, res) => {
 
         const output = await replicate.run(
             "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b",
-            { input: { image: imageUrl, scale: 4, face_enhance: true } }
+            { input: { image: capCloudinaryImageSize(imageUrl, 1400), scale: 4, face_enhance: true } }
         );
         const upscaledUrl = await resolveToCloudinaryUrl(output, "upscaled_images");
 
