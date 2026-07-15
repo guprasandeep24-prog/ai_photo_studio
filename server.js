@@ -289,7 +289,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         cleanupLocalFile(req.file.path); // local temp file ab zaroorat nahi
 
         const aiOutput = await replicate.run(
-            "pikachupichu25/image-faceswap:94b109952d4dd3cb6e9947340a6a099cc9a4821af8807a87c1f7af92e2a3b00",
+            "codeplugtech/face-swap:278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34",
             { input: { target_image: targetImageUrl, swap_image: originalImageUrl } }
         );
         const aiImageUrl = await resolveToCloudinaryUrl(aiOutput, "ai_studio_generated");
