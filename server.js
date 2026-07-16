@@ -401,19 +401,19 @@ app.post('/magic-portrait', upload.single("image"), async (req, res) => {
         cleanupLocalFile(req.file.path);
 
         const output = await replicate.run(
-            "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+            "zsxkib/instant-id:f1ca369da43885a347690a98f6b710afbf5f167cb9bf13bd5af512ba4a9f7b63",
             {
                 input: {
-                    prompt: prompt,
-                    negative_prompt: "ugly, blurry, distorted, disfigured, deformed, low quality, extra limbs, bad anatomy, noisy, glitch, watermark",
                     image: capCloudinaryImageSize(userImgUrl),
-                    prompt_strength: 0.7, // photo kitni badlegi — 0 = original jaisi hi, 1 = prompt jaisa poori tarah
-                    num_inference_steps: 40,
-                    guidance_scale: 7.5,
-                    refine: "base_image_refiner", // "expert_ensemble_refiner" sirf text-to-image (bina photo) ke liye hai — photo ke saath yeh garbled output deta hai
-                    refine_steps: 20,
-                    apply_watermark: false,
-                    disable_safety_checker: true // SDXL ka built-in filter aksar normal selfies/prompts ko bhi galti se NSFW mark kar deta hai
+                    prompt: prompt,
+                    negative_prompt: "(lowres, low quality, worst quality:1.2), (text:1.2), watermark, painting, drawing, illustration, glitch, deformed, mutated, cross-eyed, ugly, disfigured",
+                    width: 640,
+                    height: 640,
+                    ip_adapter_scale: 0.8, // chehra kitna preserve rahe — jyada = chehra zyada match karega, kam = prompt zyada haavi hoga
+                    controlnet_conditioning_scale: 0.8, // face pose/structure kitna preserve ho
+                    guidance_scale: 5,
+                    num_inference_steps: 30,
+                    disable_safety_checker: true
                 }
             }
         );
