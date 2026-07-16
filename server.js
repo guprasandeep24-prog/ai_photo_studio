@@ -23,7 +23,6 @@ const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 const Replicate = require('replicate');
 const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
 
 const Order = require('./models/Order');
 const User = require('./models/User');
@@ -53,32 +52,27 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// ---------------- Email Setup ----------------
-// NOTE: "service: 'gmail'" wala purana tareeka kabhi-kabhi cloud hosting (Render)
-// par connection timeout deta hai. Explicit host/port (587 + STARTTLS) zyada
-// reliable hai — yeh Google ka khud recommend kiya hua tareeka hai.
-// ZARURI: EMAIL_PASS mein aapka normal Gmail password NAHI chalega — Google ne
-// yeh band kar diya hai. Isme ek "App Password" (16-character code) dalna
-// hoga, jo Google Account -> Security -> 2-Step Verification -> App Passwords
-// se banta hai (2-Step Verification pehle ON hona zaroori hai).
-const emailTransporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // 587 par STARTTLS use hota hai, secure:false hi sahi hai
-    requireTLS: true, // cloud hosting (Render/Heroku type) par timeout se bachne ka pramukh fix
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    connectionTimeout: 15000, // 15 second mein fail ho jaaye, hamesha ke liye latka na rahe
-    greetingTimeout: 15000,
-    socketTimeout: 15000
-});
+// ---------------- Email Setup (Resend — HTTP API, SMTP nahi) ----------------
+// ZAROORI: Render ke FREE plan par SMTP ports (25, 465, 587) khud Render ne
+// block kar diye hain (Sept 2025 se, spam rokne ke liye) — isliye nodemailer/
+// Gmail SMTP is file mein hata diya gaya hai, woh yahan kabhi kaam nahi karega.
+// Resend normal HTTPS request bhejta hai, jo block nahi hoti.
+//
+// SETUP (5 minute ka kaam):
+// 1. https://resend.com par free account banayein
+// 2. API Key generate karein (Dashboard -> API Keys)
+// 3. Render ke Environment tab mein "RESEND_API_KEY" naam se yeh key daalein
+// 4. Shuru mein "from" address https://onboarding@resend.dev use kar sakte hain
+//    (bina kisi setup ke turant kaam karta hai). Baad mein apni domain verify
+//    karke usi domain se bhi bhej sakte hain (zyada professional dikhta hai).
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'AI Photo Studio <onboarding@resend.dev>';
 
-emailTransporter.verify((err) => {
-    if (err) console.error("⚠️ [EMAIL] Transporter setup problem:", err.message);
-    else console.log("✅ [EMAIL] Ready to send emails");
-});
+if (!RESEND_API_KEY) {
+    console.error("⚠️ [EMAIL] RESEND_API_KEY set nahi hai — emails nahi bhej paayenge. Render Environment tab mein daalein.");
+} else {
+    console.log("✅ [EMAIL] Resend configured, ready to send emails");
+}
 
 const CATEGORY_NAMES = {
     'linkedin': 'LinkedIn Professional',
@@ -90,21 +84,32 @@ const CATEGORY_NAMES = {
 };
 
 async function sendPhotoEmail(toEmail, imageUrl, category) {
-    if (!toEmail) return; // safety: email na ho to silently skip
+    if (!toEmail || !RESEND_API_KEY) return; // safety: email/key na ho to silently skip
     try {
         const categoryName = CATEGORY_NAMES[category] || 'AI Photo';
-        const mailOptions = {
-            from: `"AI Photo Studio ✨" <${process.env.EMAIL_USER}>`,
-            to: toEmail,
-            subject: `✨ Aapki ${categoryName} Photo Ready Hai!`,
-            html: `<div style="background:#0f172a;padding:30px;text-align:center;font-family:Arial;">
-                    <h2 style="color:white;">🎉 Aapki Photo Ready Hai!</h2>
-                    <p style="color:#94a3b8;">${categoryName} transformation complete!</p>
-                    <img src="${imageUrl}" width="100%" style="border-radius:16px;border:2px solid #334155;">
-                    <br><br><a href="${imageUrl}" style="background:#4f46e5;color:white;padding:12px 24px;text-decoration:none;border-radius:50px;">⬇️ Download Karo</a>
-                   </div>`
-        };
-        await emailTransporter.sendMail(mailOptions);
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${RESEND_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from: RESEND_FROM_EMAIL,
+                to: [toEmail],
+                subject: `✨ Aapki ${categoryName} Photo Ready Hai!`,
+                html: `<div style="background:#0f172a;padding:30px;text-align:center;font-family:Arial;">
+                        <h2 style="color:white;">🎉 Aapki Photo Ready Hai!</h2>
+                        <p style="color:#94a3b8;">${categoryName} transformation complete!</p>
+                        <img src="${imageUrl}" width="100%" style="border-radius:16px;border:2px solid #334155;">
+                        <br><br><a href="${imageUrl}" style="background:#4f46e5;color:white;padding:12px 24px;text-decoration:none;border-radius:50px;">⬇️ Download Karo</a>
+                       </div>`
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Resend API error (${response.status}): ${errText}`);
+        }
         console.log(`✅ [EMAIL] Sent to: ${toEmail}`);
     } catch (err) {
         // Email fail ho jaaye to bhi poora request fail nahi hona chahiye
@@ -243,11 +248,14 @@ function cleanupLocalFile(filePath) {
 // AI models (khaaskar upscale/face-swap/portrait) chhote GPU par chalte hain,
 // bahut badi photo (jaise 4000x3000 phone camera image) bhejne se
 // "greater than max size that fits in GPU memory" jaisa error aata hai.
-// Yeh function Cloudinary ke URL mein hi ek resize instruction daal deta hai,
-// taaki photo download/resize/re-upload karne ki zaroorat na pade.
+// Aur kuch models file SIZE (bytes) par bhi limit lagate hain — sirf
+// dimensions chhote karne se file size (MB) kam nahi hoti agar photo
+// high-detail/PNG ho, isliye quality compress + JPEG format bhi zaroori hai.
+// Yeh function Cloudinary ke URL mein hi resize+compress instruction daal
+// deta hai, taaki photo download/resize/re-upload karne ki zaroorat na pade.
 function capCloudinaryImageSize(url, maxDim = 1600) {
     if (!url || typeof url !== 'string' || !url.includes('/upload/')) return url;
-    return url.replace('/upload/', `/upload/w_${maxDim},h_${maxDim},c_limit/`);
+    return url.replace('/upload/', `/upload/w_${maxDim},h_${maxDim},c_limit,q_auto:good,f_jpg/`);
 }
 
 // =====================================================================
@@ -397,8 +405,13 @@ app.post('/magic-portrait', upload.single("image"), async (req, res) => {
             {
                 input: {
                     prompt: prompt,
+                    negative_prompt: "ugly, blurry, distorted, disfigured, deformed, low quality, extra limbs, bad anatomy, noisy, glitch, watermark",
                     image: capCloudinaryImageSize(userImgUrl),
-                    refine: "expert_ensemble_refiner",
+                    prompt_strength: 0.7, // photo kitni badlegi — 0 = original jaisi hi, 1 = prompt jaisa poori tarah
+                    num_inference_steps: 40,
+                    guidance_scale: 7.5,
+                    refine: "base_image_refiner", // "expert_ensemble_refiner" sirf text-to-image (bina photo) ke liye hai — photo ke saath yeh garbled output deta hai
+                    refine_steps: 20,
                     apply_watermark: false,
                     disable_safety_checker: true // SDXL ka built-in filter aksar normal selfies/prompts ko bhi galti se NSFW mark kar deta hai
                 }
