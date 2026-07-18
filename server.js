@@ -470,6 +470,54 @@ app.post('/upscale', async (req, res) => {
     }
 });
 
+// ---------------- AI PROMPT STUDIO (Business prompt generator) ----------------
+app.post('/generate-prompt', async (req, res) => {
+    try {
+        const { userId, email, profession, task, tone } = req.body;
+
+        const user = await User.findOne({ firebaseUid: userId });
+        if (!user) return res.status(404).json({ success: false, error: "User not found" });
+        if (user.credits <= 0) return res.status(400).json({ success: false, error: "Insufficient credits!" });
+        if (!profession || !task) return res.status(400).json({ success: false, error: "Profession and task are required" });
+
+        const combinedPrompt = `You are an expert AI prompt engineer who creates ready-to-use ChatGPT/Gemini prompts for business professionals. Based on the user's profession, task and tone below, write ONE professional, copy-paste-ready prompt with fillable placeholders in [ ] (like [Name], [Date]).
+
+Profession: ${profession}
+Task: ${task}
+Tone: ${tone}
+
+Respond with ONLY this JSON object, no other text, no markdown code fences:
+{"title": "a short title", "prompt": "the full ready-to-use prompt text", "sopTip": "one line usage tip"}`;
+
+        const output = await replicate.run("meta/meta-llama-3-70b-instruct", {
+            input: {
+                prompt: combinedPrompt,
+                max_tokens: 800,
+                temperature: 0.7
+            }
+        });
+
+        const rawText = Array.isArray(output) ? output.join('') : String(output);
+        const cleaned = rawText.replace(/```json|```/g, '').trim();
+
+        let parsed;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch (parseErr) {
+            console.error("❌ [PROMPT STUDIO] JSON parse fail, raw output:", rawText);
+            return res.status(502).json({ success: false, error: "AI response ko samajh nahi paaye, dobara koshish karein" });
+        }
+
+        user.credits -= 1;
+        await user.save();
+
+        res.json({ success: true, title: parsed.title, prompt: parsed.prompt, sopTip: parsed.sopTip });
+    } catch (err) {
+        console.error("❌ [PROMPT STUDIO ERROR]:", err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.get('/my-photos', async (req, res) => {
     try {
         const photos = await Order.find({ userId: req.query.userId, status: 'completed' }).sort({ createdAt: -1 });

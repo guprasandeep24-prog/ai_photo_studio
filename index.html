@@ -109,6 +109,18 @@
         </div>
     </header>
 
+    <!-- Elegant Footer -->
+    <footer class="glass border-t border-white/10 py-10 mt-20">
+        <div class="container mx-auto px-6 text-center">
+            <h4 class="text-white font-bold mb-4 text-lg">Explore Our AI Universe ✨</h4>
+            <div class="flex justify-center gap-8 text-sm text-slate-400 mb-6">
+                <a href="https://bestaitools.co.in/" class="hover:text-indigo-400 transition">Best AI Tools</a>
+                <a href="https://userfinetools.store" class="hover:text-indigo-400 transition">UserFine Tools</a>
+            </div>
+            <p class="text-xs text-slate-500">© 2026 AI Photo Studio. All rights reserved.</p>
+        </div>
+    </footer>
+
     <!-- Dashboard Section -->
     <section id="dashboard-section" class="hidden container mx-auto px-6 py-10">
         <div class="flex justify-between items-end mb-8">
@@ -158,6 +170,15 @@
                 <h3 class="text-2xl font-bold mb-1 text-white">🎭 Magic Portrait</h3>
                 <p class="text-slate-400 text-sm">Upload your photo + Prompt to transform your identity!</p>
             </div>
+
+            <!-- BLOCK 1: NAYA CARD -->
+            <div onclick="openPromptStudio()" class="category-card cursor-pointer glass p-8 rounded-3xl text-center group border-2 border-amber-500/30 hover:border-amber-500 transition">
+                <div class="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-lightbulb"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-1 text-white">💡 AI Prompt Studio</h3>
+                <p class="text-slate-400 text-sm">Apne business ke liye ready-to-use AI prompts paayein!</p>
+            </div>
         </div>
     </section>
 
@@ -199,6 +220,64 @@
                 <button id="generate-portrait-btn" class="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold rounded-2xl shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2">
                     <span id="portrait-btn-text">Generate Portrait 🎭</span>
                     <div id="portrait-btn-spinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOCK 2: NAYA MODAL -->
+    <!-- AI PROMPT STUDIO MODAL -->
+    <div id="promptStudioModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center z-[150] p-4 overflow-y-auto">
+        <div class="glass p-8 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center border border-white/20 my-8">
+            <button onclick="closePromptStudio()" class="float-right text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <h2 class="text-3xl font-bold mb-2 text-amber-400 pt-4">AI Prompt Studio</h2>
+            <p class="text-slate-400 mb-6 text-sm">Apna profession aur kaam batayein, turant ek ready prompt paayein!</p>
+
+            <div class="space-y-4 text-left">
+                <div>
+                    <label class="block text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">Profession / Niche</label>
+                    <select id="promptProfession" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="Real Estate Agent">Real Estate Agent</option>
+                        <option value="Coaching Center / Teacher">Coaching Center / Teacher</option>
+                        <option value="D2C / E-commerce Brand">D2C / E-commerce Brand</option>
+                        <option value="Salon / Spa">Salon / Spa</option>
+                        <option value="Freelance Lawyer">Freelance Lawyer</option>
+                        <option value="Fitness Coach">Fitness Coach</option>
+                        <option value="custom">Other (Type your own)</option>
+                        <option value="Restaurant Owner">Restaurant Owner</option>
+                        <option value="Makeup Artist">Makeup Artist</option>
+                        <option value="Dentist">Dentist</option>
+                        <option value="custom">Other (Type your own)</option>
+                    </select>
+                    <input type="text" id="promptProfessionCustom" placeholder="Apna profession likhein" class="hidden w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">Tone</label>
+                    <select id="promptTone" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="Professional">Professional</option>
+                        <option value="Friendly">Friendly</option>
+                        <option value="Persuasive / Sales-focused">Persuasive / Sales-focused</option>
+                        <option value="Formal">Formal</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">Aapko kis kaam ke liye prompt chahiye?</label>
+                    <textarea id="promptTask" rows="3" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none" placeholder="jaise: naye customer ki inquiry ka WhatsApp jawab"></textarea>
+                </div>
+            </div>
+
+            <button id="generatePromptBtn" class="w-full mt-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-2xl shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2">
+                <span id="promptBtnText">Prompt Generate Karein ✨</span>
+                <div id="promptBtnSpinner" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+            </button>
+
+            <div id="promptResultBox" class="hidden mt-6 text-left bg-black/30 border border-amber-500/30 rounded-2xl p-5 relative">
+                <span class="absolute -top-3 right-4 bg-amber-500 text-slate-900 text-[10px] font-bold px-2.5 py-1 rounded uppercase">SOP</span>
+                <p id="promptResultTitle" class="text-white font-bold mb-3 pr-14"></p>
+                <div id="promptResultText" class="text-slate-300 text-sm font-mono whitespace-pre-wrap bg-black/30 rounded-xl p-4 leading-relaxed"></div>
+                <p id="promptResultTip" class="text-amber-300/80 text-xs mt-3 bg-amber-500/10 rounded-lg p-3"></p>
+                <button id="copyPromptBtn" class="mt-3 border border-amber-500 text-amber-400 hover:bg-amber-500/10 font-bold text-xs rounded-lg px-4 py-2">
+                    <i class="fa-solid fa-copy mr-1"></i> Prompt Copy Karein
                 </button>
             </div>
         </div>
@@ -358,37 +437,33 @@
     };
 
     // Global helper for fetch with automatic timeout
-    // 🚀 Yeh "Super Debugger" hai. Agar kuch kaam nahi karega, 
-// toh ye spinner band karke bata dega ki "URL galat hai" ya "Server down hai".
-async function fetchWithTimeout(url, options, timeoutMs = 150000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    
-    console.log("📡 Attempting to call:", url); // Debugging ke liye
+    async function fetchWithTimeout(url, options, timeoutMs = 150000) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeoutMs);
+        
+        console.log("📡 Attempting to call:", url); 
 
-    try {
-        const response = await fetch(url, { ...options, signal: controller.signal });
-        clearTimeout(id);
-        
-        if (!response.ok) {
-            // Agar server 404 ya 500 de raha hai, toh yahan se error pakad lo
-            const errorText = await response.text(); 
-            console.error("❌ Server responded with error:", response.status, errorText);
-            throw new Error(`Server Error: ${response.status}`);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(id);
+            
+            if (!response.ok) {
+                const errorText = await response.text(); 
+                console.error("❌ Server responded with error:", response.status, errorText);
+                throw new Error(`Server Error: ${response.status}`);
+            }
+            
+            return response;
+        } catch (error) {
+            clearTimeout(id);
+            console.error("❌ Fetch Error:", error.name, error.message);
+            
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                throw new Error("Connection Failed! Check if your BASE_URL is correct.");
+            }
+            throw error;
         }
-        
-        return response;
-    } catch (error) {
-        clearTimeout(id);
-        console.error("❌ Fetch Error:", error.name, error.message);
-        
-        // 💡 Agar URL galat hai toh ye error dikhayega
-        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            throw new Error("Connection Failed! Check if your BASE_URL is correct.");
-        }
-        throw error;
     }
-}
 
     window.selectedCategory = ""; 
     window.selectedGender = ""; 
@@ -508,7 +583,6 @@ async function fetchWithTimeout(url, options, timeoutMs = 150000) {
                 body: JSON.stringify({ userId: user.uid, email: user.email, prompt: promptText })
             });
             
-            // BUFFER CHECK: Validate JSON
             let result;
             try {
                 result = await response.json();
@@ -585,7 +659,6 @@ async function fetchWithTimeout(url, options, timeoutMs = 150000) {
         removePortraitBtn.classList.add('hidden');
     });
 
-    // ✅ FIXED: MAGIC PORTRAIT SUBMIT HANDLER (BULLPROOF)
     document.getElementById('generate-portrait-btn').addEventListener('click', async function() {
         const user = auth.currentUser;
         const prompt = document.getElementById('portrait-prompt-input').value.trim();
@@ -594,7 +667,6 @@ async function fetchWithTimeout(url, options, timeoutMs = 150000) {
         if (!window.portraitFile) return alert("Please upload your photo first!");
         if (!prompt) return alert("Please describe your new look!");
 
-        // Start Loading
         window.setLoadingState(true, 'portrait');
 
         try {
@@ -609,7 +681,6 @@ async function fetchWithTimeout(url, options, timeoutMs = 150000) {
                 body: formData
             });
 
-            // CRITICAL: Handle JSON error properly
             let result;
             try {
                 result = await response.json();
@@ -634,8 +705,77 @@ async function fetchWithTimeout(url, options, timeoutMs = 150000) {
             console.error("❌ Error:", error);
             alert("❌ " + (error.name === 'AbortError' ? "Timeout! Try again." : error.message));
         } finally {
-            // NO MATTER WHAT HAPPENS, HIDE SPINNER
             window.setLoadingState(false, 'portrait');
+        }
+    });
+
+    // --- AI PROMPT STUDIO ---
+    window.openPromptStudio = () => document.getElementById('promptStudioModal').classList.remove('hidden');
+    window.closePromptStudio = () => {
+        document.getElementById('promptStudioModal').classList.add('hidden');
+        document.getElementById('promptResultBox').classList.add('hidden');
+        document.getElementById('promptTask').value = '';
+    };
+
+    document.getElementById('promptProfession').addEventListener('change', function() {
+        document.getElementById('promptProfessionCustom').classList.toggle('hidden', this.value !== 'custom');
+    });
+
+    document.getElementById('copyPromptBtn').addEventListener('click', function() {
+        const text = document.getElementById('promptResultText').textContent;
+        navigator.clipboard.writeText(text);
+        this.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Copied!';
+        setTimeout(() => { this.innerHTML = '<i class="fa-solid fa-copy mr-1"></i> Prompt Copy Karein'; }, 1600);
+    });
+
+    document.getElementById('generatePromptBtn').addEventListener('click', async function() {
+        const user = auth.currentUser;
+        if (!user) return alert("Please Login first!");
+
+        const professionSelect = document.getElementById('promptProfession');
+        const profession = professionSelect.value === 'custom'
+            ? document.getElementById('promptProfessionCustom').value.trim()
+            : professionSelect.value;
+        const tone = document.getElementById('promptTone').value;
+        const task = document.getElementById('promptTask').value.trim();
+
+        if (!profession || !task) return alert("Please fill profession and task!");
+
+        const btnText = document.getElementById('promptBtnText');
+        const btnSpinner = document.getElementById('promptBtnSpinner');
+        btnText.classList.add('hidden');
+        btnSpinner.classList.remove('hidden');
+        document.getElementById('promptResultBox').classList.add('hidden');
+
+        try {
+            const response = await fetchWithTimeout(`${BASE_URL}/generate-prompt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.uid, email: user.email, profession, task, tone })
+            });
+
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                throw new Error("Server error, try again.");
+            }
+
+            if (result.success) {
+                document.getElementById('promptResultTitle').innerText = result.title || 'Your Prompt';
+                document.getElementById('promptResultText').innerText = result.prompt || '';
+                document.getElementById('promptResultTip').innerText = 'Tip: ' + (result.sopTip || '');
+                document.getElementById('promptResultBox').classList.remove('hidden');
+                const creditsSpan = document.getElementById('user-credits');
+                if (creditsSpan) creditsSpan.innerText = Math.max(0, parseInt(creditsSpan.innerText || '0') - 1);
+            } else {
+                throw new Error(result.error || "Prompt generation failed");
+            }
+        } catch (error) {
+            alert("❌ " + (error.name === 'AbortError' ? "Timeout! Try again." : error.message));
+        } finally {
+            btnText.classList.remove('hidden');
+            btnSpinner.classList.add('hidden');
         }
     });
 
