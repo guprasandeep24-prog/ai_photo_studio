@@ -121,50 +121,53 @@ async function sendPhotoEmail(toEmail, imageUrl, category) {
 const TEMPLATES = {
     'linkedin': {
         'man': [
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396313/linkdin_ceo_man2_lcz3pr.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396319/linkdin_ceo_man1_kyl019.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475527/6manceo_nlnqtb.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475517/7manceo_cyjhce.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475510/5manceo_n4lmd3.jpg'
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718677/linkdin_ceo_man1_nyfori.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718670/linkdin_ceo_man2_ykybwq.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718661/7manceo_sh8uev.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718658/6manceo_edmnhi.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718653/5manceo_sklodb.jpg'
         ],
         'woman': [
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396312/linkdin_ceo_woman1_b7te2c.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475519/6ladisceo_ol7rrf.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475510/5ladisceo_ypnjv8.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475510/7ladisceo_vqq6bt.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782476890/womanceo5_xyaguv.jpg'
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718651/5ladisceo_s47l4q.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718643/6ladisceo_gwiows.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718656/7ladisceo_cdhdjw.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718707/womanceo5_umbork.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718685/linkdin_ceo_woman1_micvyn.jpg'
         ]
     },
     'wedding': {
         'man': [
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396313/wedding_man_y6wpzx.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782476491/man_wedding4_mlu9pn.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782476491/man_wedding2_oze1yw.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782476491/man_wedding5_q3sffj.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782476500/man_wedding3_yybehx.jpg'
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718687/wedding_man_rc1tan.jpg', 'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718702/man_wedding3_lrpsrm.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718692/man_wedding2_pdnn3u.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718679/man_wedding4_gzlyyw.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718689/man_wedding5_eegk3i.jpg'
         ],
         'woman': [
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396312/Wedding_ladis1_hag27g.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396313/wedding_ladies2_pzl1ky.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396306/wedding_ladies3_fodvpi.png',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475506/ladis_wedding7_mlwije.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475502/wedding_ladis5_hu89ax.jpg'
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718687/wedding_ladies3_sntl8y.png',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718711/ladis_wedding7_rj1hhf.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718715/wedding_ladis8_ab7utb.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718700/Wedding_ladis1_czwtjv.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718685/wedding_ladies2_ikbyud.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718700/wedding_ladies4_qwiz0n.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718718/wedding_ladis5_zructw.jpg',
+'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718701/wedding_ladis6_hgk5r1.jpg'
         ]
     },
     'fashion': {
         'man': [
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396314/man_fashion_image_pbxhpj.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475517/4manfashion_xnmmis.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475490/3mainfashion_b1g93r.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475486/2manfashion_qwuq46.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475485/1man_fashion_ysxyj6.jpg'
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718676/man_fashion_image_x1yxsi.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718670/1man_fashion_zzslle.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718664/4manfashion_tutgx7.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718648/2manfashion_w8fczz.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718622/3mainfashion_ogkza9.jpg'
         ],
         'woman': [
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782396307/indian_woman_fashion_fak0sy.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475513/7ladisfashion_g0dzz3.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475506/9ladisfashion_fqedqe.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475503/8ladisfashion_tfkxfl.jpg',
-            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1782475494/6ladiesfashion_jcmgzk.jpg'
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718671/indian_woman_fashion_sy5rdy.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718669/9ladisfashion_hslpsr.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718665/7ladisfashion_dprqzb.jpg',
+            'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718665/8ladisfashion_reeiqh.jpg',
+           'https://res.cloudinary.com/dh8klfp1s/image/upload/v1784718638/6ladiesfashion_zm9f59.jpg'
+
         ]
     }
 };
